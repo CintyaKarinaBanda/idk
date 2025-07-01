@@ -1,7 +1,7 @@
 # Configuración de AWS
 AWS_CONFIG = {
     "REGION": "us-east-1",
-    "ROLE_ARN": "arn:aws:iam::634576771855:role/ExtractData", 
+    "ROLE_ARN": "arn:aws:iam::883278715161:role/ExtractData", 
     "ROLE_SESSION_NAME": "EstafetaMonitoringSession"
 }
 
@@ -24,6 +24,15 @@ REPORT_CONFIG = {
     "EXCEL_DIR": "excel",
     "DEFAULT_KEYWORD": "EST"
 }
+
+DB_CONFIG = {
+    "HOST": "localhost",               
+    "DATABASE": "alarmasdb",         
+    "USER": "alarmas",                 
+    "PASSWORD": "Estafeta_1",          
+    "PORT": "5432"                     
+}
+
 
 EXCEL_STYLES = {
     "HEADER_COLOR": "4472C4",
