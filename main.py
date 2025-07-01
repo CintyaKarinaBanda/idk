@@ -47,12 +47,23 @@ def analizar_mensajes(service, messages, account_names, horas=None):
         namespace = re.search(r'Namespace:\s+([^\s,]+)', body)
         reason = re.search(r'NewStateReason:\s+([^\n]+)', body)
         
+        # Extraer el servicio/recurso del asunto
+        servicio_recurso = ''
+        if subject:
+            # Buscar patrones como "*Critical* HTTPCode_ELB_5XX_Count del ELB: alb-asg-WSFrecuency-prod-pub"
+            # o "*Warning Memory % Committed Bytes In Use* EMAWSBSDB01 (DB Windows 2016)"
+            # o "*Critical cluster_failed_node_count* cluster-stack (EKS)"
+            match = re.search(r'\*(?:Critical|Warning|Info)(?:\s+[^*]+)?\*\s+([^"]+)', subject)
+            if match:
+                servicio_recurso = match.group(1).strip()
+        
         account_id = aws_account.group(1) if aws_account else ''
         
         data.append({
             'Id cuenta': account_id,
             'Nombre cuenta': account_names.get(account_id, 'Desconocido'),
             'Metrica': metric_name.group(1) if metric_name else '',
+            'Servicio': servicio_recurso,
             'Namespace': namespace.group(1) if namespace else '',
             'Estado': estado,
             'Fecha': fecha_dt,
@@ -66,7 +77,7 @@ def crear_mensaje_correo(periodo, horas, df):
     if periodo == 'mensual':
         subject = f"Concentrado mensual de alarmas Estafeta: {fecha_actual}"
         detalle = f"Se adjunta el concentrado mensual de alarmas de Estafeta.\n\n"
-    elif periodo == 'custom_horas':
+    elif periodo == 'custom':
         subject = f"Concentrado de alarmas Estafeta: {len(df)} alertas en últimas {horas}h ({fecha_actual})"
         detalle = f"Se adjunta el concentrado de alarmas de Estafeta de las últimas {horas} horas.\n"
     else:
@@ -91,7 +102,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
     try:
         account_names = setup_aws()
         
-        if periodo == 'custom_horas' or periodo == 'diario':
+        if periodo == 'custom' or periodo == 'diario':
             desde = datetime.now()
             if horas:
                 desde -= timedelta(hours=horas)
@@ -161,7 +172,7 @@ def main(periodo, keyword=REPORT_CONFIG["DEFAULT_KEYWORD"], horas_custom=None):
     service = setup_gmail()
     
     # Determinar las horas para el periodo personalizado
-    horas = horas_custom if horas_custom else HORAS_CUSTOM if periodo == 'custom_horas' else None
+    horas = horas_custom if horas_custom else HORAS_CUSTOM if periodo == 'custom' else None
     generar_reporte(service, keyword, periodo, horas)
 
     print("✅ Reportes generados con éxito. Incluyen")
@@ -176,12 +187,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Genera reportes de alertas de AWS')
     parser.add_argument('--periodo', 
                       default="mensual",
-                      choices=["diario", "semanal", "mensual", "custom_horas"],
-                      help='Periodo a generar (diario, semanal, mensual, custom_horas)')
+                      choices=["diario", "semanal", "mensual", "custom"],
+                      help='Periodo a generar (diario, semanal, mensual, custom)')
     parser.add_argument('--keyword', default=REPORT_CONFIG["DEFAULT_KEYWORD"],
                       help='Palabra clave para buscar en los correos')
     parser.add_argument('--horas', type=int, default=None,
-                      help='Número de horas para el periodo custom_horas')
+                      help='Número de horas para el periodo custom')
     
     args = parser.parse_args()
     main(args.periodo, args.keyword, args.horas)

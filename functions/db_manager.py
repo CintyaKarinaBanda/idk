@@ -18,8 +18,42 @@ def get_sqlalchemy_engine():
     """Obtiene un motor SQLAlchemy para operaciones con pandas"""
     return create_engine(f'postgresql://{DB_CONFIG["USER"]}:{DB_CONFIG["PASSWORD"]}@{DB_CONFIG["HOST"]}:{DB_CONFIG["PORT"]}/{DB_CONFIG["DATABASE"]}')
 
+def crear_tabla_si_no_existe():
+    """Crea la tabla de alertas si no existe"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Crear tabla de alertas
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS alertas (
+        id SERIAL PRIMARY KEY,
+        cuenta_id TEXT,
+        cuenta_nombre TEXT,
+        metrica TEXT,
+        servicio TEXT,
+        namespace TEXT,
+        estado TEXT,
+        fecha TIMESTAMP,
+        fecha_str TEXT
+    )
+    """)
+    
+    # Crear índice único para evitar duplicados
+    try:
+        cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_alertas_unique 
+        ON alertas (cuenta_id, metrica, fecha)
+        """)
+    except Exception as e:
+        print(f"Nota: No se pudo crear el índice único: {e}")
+        # Continuar aunque no se pueda crear el índice
+    
+    conn.commit()
+    conn.close()
+    print("✅ Base de datos verificada/creada")
+
 def insertar_alertas(df):
-    """Inserta las alertas del DataFrame en la base de datos"""
+    """Inserta las alertas del DataFrame en la base de datos, evitando duplicados"""
     if df.empty:
         print("⚠️ No hay alertas para insertar en la base de datos")
         return 0
@@ -29,21 +63,46 @@ def insertar_alertas(df):
         'Id cuenta': 'cuenta_id',
         'Nombre cuenta': 'cuenta_nombre',
         'Metrica': 'metrica',
+        'Servicio': 'servicio',
         'Namespace': 'namespace',
         'Estado': 'estado',
         'Fecha': 'fecha',
         'Fecha_str': 'fecha_str'
     })
     
-    # Insertar datos usando SQLAlchemy
-    engine = get_sqlalchemy_engine()
-    df_db.to_sql('alertas', engine, if_exists='append', index=False)
+    # Obtener conexión y cursor
+    conn = get_connection()
+    cursor = conn.cursor()
     
-    # Obtener el número de filas insertadas
-    count = len(df_db)
+    # Contador de filas insertadas
+    inserted_count = 0
     
-    print(f"✅ {count} alertas insertadas en la base de datos")
-    return count
+    # Insertar fila por fila verificando duplicados
+    for _, row in df_db.iterrows():
+        # Verificar si ya existe una alerta con la misma cuenta, métrica y fecha
+        cursor.execute("""
+        SELECT id FROM alertas 
+        WHERE cuenta_id = %s AND metrica = %s AND fecha = %s
+        """, (row['cuenta_id'], row['metrica'], row['fecha']))
+        
+        # Si no existe, insertar
+        if cursor.fetchone() is None:
+            cursor.execute("""
+            INSERT INTO alertas (cuenta_id, cuenta_nombre, metrica, servicio, namespace, estado, fecha, fecha_str)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                row['cuenta_id'], row['cuenta_nombre'], row['metrica'], 
+                row['servicio'], row['namespace'], row['estado'], 
+                row['fecha'], row['fecha_str']
+            ))
+            inserted_count += 1
+    
+    # Confirmar cambios y cerrar conexión
+    conn.commit()
+    conn.close()
+    
+    print(f"✅ {inserted_count} alertas insertadas en la base de datos (evitando duplicados)")
+    return inserted_count
 
 def obtener_alertas_por_periodo(periodo):
     """Obtiene alertas de la base de datos según el periodo especificado"""
@@ -64,6 +123,7 @@ def obtener_alertas_por_periodo(periodo):
         cuenta_id as "Id cuenta",
         cuenta_nombre as "Nombre cuenta",
         metrica as "Metrica",
+        servicio as "Servicio",
         namespace as "Namespace",
         estado as "Estado",
         fecha as "Fecha",
