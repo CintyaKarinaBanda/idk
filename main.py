@@ -491,7 +491,8 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
     # Enviar correo con el reporte
     try:
         sufijo = f"_ultimas_{horas}h" if horas else ""
-        archivo_adjunto = f'Alertas_{periodo}{sufijo}.xlsx'
+        nombre_archivo = f'Alertas_{periodo}{sufijo}.xlsx'
+        archivo_adjunto = os.path.join(os.getcwd(), REPORT_CONFIG["EXCEL_DIR"], nombre_archivo)
         
         # Crear asunto y mensaje
         subject, message = crear_mensaje_correo(periodo, horas, df)
