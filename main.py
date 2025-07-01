@@ -47,48 +47,41 @@ def analizar_mensajes(service, messages, account_names, horas=None):
         namespace = re.search(r'Namespace:\s+([^\s,]+)', body)
         reason = re.search(r'NewStateReason:\s+([^\n]+)', body)
         
-        # Extraer directamente del asunto ya que los ejemplos muestran que el formato es consistente
+        # Extraer servicio/recurso SOLO del cuerpo del mensaje
         servicio_recurso = ''
         
-        # Extraer del asunto usando el formato de los ejemplos proporcionados
-        # Ejemplos: "Est-Eks *Warning node_cpu_utilization* cluster-stack (EKS)"
-        #          "Est-Multi *Warning Memory % Committed Bytes In Use* EMAWSBSDB01 (DB Windows 2016) a"
-        if subject:
-            # Patrón para extraer todo el asunto después de los asteriscos
-            match = re.search(r'Est-[^\s*]+\s+\*(?:Critical|Warning|Info)[^*]*\*\s*(.*)', subject)
+        # Patrón 1: Buscar en el cuerpo el nombre completo de la alarma
+        # "Alarm Name: Est-Eks *Warning node_cpu_utilization* cluster-stack (EKS)"
+        alarm_name_match = re.search(r'Alarm Name:\s*([^\n]+)', body)
+        if alarm_name_match:
+            full_alarm = alarm_name_match.group(1).strip()
+            # Extraer la parte después de los asteriscos
+            match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*(.*)', full_alarm)
             if match:
                 servicio_recurso = match.group(1).strip()
-            
-            # Si no se encontró, intentar con otro patrón
-            if not servicio_recurso:
-                match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*(.*)', subject)
-                if match:
-                    servicio_recurso = match.group(1).strip()
+            else:
+                servicio_recurso = full_alarm
         
-        # Si no se encontró en el asunto, intentar extraer del cuerpo como respaldo
+        # Patrón 2: Buscar en el cuerpo menciones a CloudWatch Alarm
+        # "your Amazon CloudWatch Alarm "Est-Multi *Warning Memory % Committed Bytes In Use* EMAWSBSDB01 (DB Windows 2016)"
         if not servicio_recurso:
-            # Patrón 1: "Alarm Name: Est-FreCot *Critical* HTTPCode_ELB_5XX_Count del ELB: alb-asg-WSFrecuency-prod-pub"
-            alarm_name_match = re.search(r'Alarm Name:\s*([^\n]+)', body)
-            if alarm_name_match:
-                full_alarm = alarm_name_match.group(1).strip()
+            alarm_match = re.search(r'CloudWatch Alarm\s+"([^"]+)"', body)
+            if alarm_match:
+                full_alarm = alarm_match.group(1).strip()
                 # Extraer la parte después de los asteriscos
                 match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*(.*)', full_alarm)
                 if match:
                     servicio_recurso = match.group(1).strip()
                 else:
                     servicio_recurso = full_alarm
-            
-            # Patrón 2: "your Amazon CloudWatch Alarm "Est-Multi *Warning Memory % Committed Bytes In Use* EMAWSBSDB01 (DB Windows 2016)"
-            if not servicio_recurso:
-                alarm_match = re.search(r'CloudWatch Alarm\s+"([^"]+)"', body)
-                if alarm_match:
-                    full_alarm = alarm_match.group(1).strip()
-                    # Extraer la parte después de los asteriscos
-                    match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*(.*)', full_alarm)
-                    if match:
-                        servicio_recurso = match.group(1).strip()
-                    else:
-                        servicio_recurso = full_alarm
+        
+        # Patrón 3: Buscar directamente en el cuerpo patrones como los ejemplos
+        if not servicio_recurso:
+            # Buscar patrones como "Est-Eks *Critical cluster_failed_node_count* cluster-stack (EKS)"
+            pattern = r'Est-[^\s*]+\s+\*(?:Critical|Warning|Info)[^*]*\*\s+([^\n]+)'
+            matches = re.findall(pattern, body)
+            if matches:
+                servicio_recurso = matches[0].strip()
         
         account_id = aws_account.group(1) if aws_account else ''
         
