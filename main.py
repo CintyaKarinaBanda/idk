@@ -47,44 +47,48 @@ def analizar_mensajes(service, messages, account_names, horas=None):
         namespace = re.search(r'Namespace:\s+([^\s,]+)', body)
         reason = re.search(r'NewStateReason:\s+([^\n]+)', body)
         
-        # Extraer servicio/recurso del cuerpo del mensaje
+        # Extraer directamente del asunto ya que los ejemplos muestran que el formato es consistente
         servicio_recurso = ''
         
-        # Buscar patrones en el cuerpo
-        # Patrón 1: "Alarm Name: Est-FreCot *Critical* HTTPCode_ELB_5XX_Count del ELB: alb-asg-WSFrecuency-prod-pub"
-        alarm_name_match = re.search(r'Alarm Name:\s*([^\n]+)', body)
-        if alarm_name_match:
-            servicio_recurso = alarm_name_match.group(1).strip()
-        
-        # Patrón 2: "your Amazon CloudWatch Alarm "Est-Multi *Warning Memory % Committed Bytes In Use* EMAWSBSDB01 (DB Windows 2016)"
-        if not servicio_recurso:
-            alarm_match = re.search(r'CloudWatch Alarm\s+"([^"]+)"', body)
-            if alarm_match:
-                servicio_recurso = alarm_match.group(1).strip()
-        
-        # Patrón 3: "Est-Eks *Critical cluster_failed_node_count* cluster-stack (EKS)"
-        if not servicio_recurso:
-            alarm_match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*([^\(\n]+)\s*(?:\(([^\)]*)\))?', body)
-            if alarm_match:
-                servicio_base = alarm_match.group(1).strip() if alarm_match.group(1) else ''
-                tipo_servicio = alarm_match.group(2).strip() if alarm_match.group(2) and len(alarm_match.groups()) > 1 else ''
-                
-                if tipo_servicio:
-                    servicio_recurso = f"{servicio_base} ({tipo_servicio})"
-                elif servicio_base:
-                    servicio_recurso = servicio_base
-        
-        # Si no se encontró en el cuerpo, intentar extraer del asunto como respaldo
-        if not servicio_recurso and subject:
-            # Buscar entre comillas
-            match = re.search(r'"([^"]+)"', subject)
+        # Extraer del asunto usando el formato de los ejemplos proporcionados
+        # Ejemplos: "Est-Eks *Warning node_cpu_utilization* cluster-stack (EKS)"
+        #          "Est-Multi *Warning Memory % Committed Bytes In Use* EMAWSBSDB01 (DB Windows 2016) a"
+        if subject:
+            # Patrón para extraer todo el asunto después de los asteriscos
+            match = re.search(r'Est-[^\s*]+\s+\*(?:Critical|Warning|Info)[^*]*\*\s*(.*)', subject)
             if match:
                 servicio_recurso = match.group(1).strip()
-            else:
-                # Buscar después de asteriscos
-                match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*([^\n]+)', subject)
+            
+            # Si no se encontró, intentar con otro patrón
+            if not servicio_recurso:
+                match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*(.*)', subject)
                 if match:
                     servicio_recurso = match.group(1).strip()
+        
+        # Si no se encontró en el asunto, intentar extraer del cuerpo como respaldo
+        if not servicio_recurso:
+            # Patrón 1: "Alarm Name: Est-FreCot *Critical* HTTPCode_ELB_5XX_Count del ELB: alb-asg-WSFrecuency-prod-pub"
+            alarm_name_match = re.search(r'Alarm Name:\s*([^\n]+)', body)
+            if alarm_name_match:
+                full_alarm = alarm_name_match.group(1).strip()
+                # Extraer la parte después de los asteriscos
+                match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*(.*)', full_alarm)
+                if match:
+                    servicio_recurso = match.group(1).strip()
+                else:
+                    servicio_recurso = full_alarm
+            
+            # Patrón 2: "your Amazon CloudWatch Alarm "Est-Multi *Warning Memory % Committed Bytes In Use* EMAWSBSDB01 (DB Windows 2016)"
+            if not servicio_recurso:
+                alarm_match = re.search(r'CloudWatch Alarm\s+"([^"]+)"', body)
+                if alarm_match:
+                    full_alarm = alarm_match.group(1).strip()
+                    # Extraer la parte después de los asteriscos
+                    match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*(.*)', full_alarm)
+                    if match:
+                        servicio_recurso = match.group(1).strip()
+                    else:
+                        servicio_recurso = full_alarm
         
         account_id = aws_account.group(1) if aws_account else ''
         
