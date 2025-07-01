@@ -42,7 +42,7 @@ def crear_tabla_si_no_existe():
     try:
         cursor.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_alertas_unique 
-        ON alertas (cuenta_id, metrica, fecha)
+        ON alertas (cuenta_id, metrica, servicio, fecha)
         """)
     except Exception as e:
         print(f"Nota: No se pudo crear el índice único: {e}")
@@ -79,11 +79,11 @@ def insertar_alertas(df):
     
     # Insertar fila por fila verificando duplicados
     for _, row in df_db.iterrows():
-        # Verificar si ya existe una alerta con la misma cuenta, métrica y fecha
+        # Verificar si ya existe una alerta con la misma cuenta, métrica, servicio y fecha
         cursor.execute("""
         SELECT id FROM alertas 
-        WHERE cuenta_id = %s AND metrica = %s AND fecha = %s
-        """, (row['cuenta_id'], row['metrica'], row['fecha']))
+        WHERE cuenta_id = %s AND metrica = %s AND servicio = %s AND fecha = %s
+        """, (row['cuenta_id'], row['metrica'], row['servicio'], row['fecha']))
         
         # Si no existe, insertar
         if cursor.fetchone() is None:

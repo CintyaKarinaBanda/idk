@@ -8,7 +8,7 @@ import yagmail
 from functions.aws_manager import setup_aws
 from functions.gmail_manager import setup_gmail, get_emails 
 from functions.excel_manager import generar_excel
-from functions.db_manager import insertar_alertas, obtener_alertas_por_periodo
+from functions.db_manager import crear_tabla_si_no_existe, insertar_alertas, obtener_alertas_por_periodo
 from config import EMAIL_CONFIG, REPORT_CONFIG
 
 HORAS_CUSTOM = REPORT_CONFIG["HORAS_CUSTOM"]
@@ -47,15 +47,21 @@ def analizar_mensajes(service, messages, account_names, horas=None):
         namespace = re.search(r'Namespace:\s+([^\s,]+)', body)
         reason = re.search(r'NewStateReason:\s+([^\n]+)', body)
         
-        # Extraer el servicio/recurso del asunto
+        # Extraer servicio/recurso del asunto
         servicio_recurso = ''
         if subject:
-            # Buscar patrones como "*Critical* HTTPCode_ELB_5XX_Count del ELB: alb-asg-WSFrecuency-prod-pub"
-            # o "*Warning Memory % Committed Bytes In Use* EMAWSBSDB01 (DB Windows 2016)"
-            # o "*Critical cluster_failed_node_count* cluster-stack (EKS)"
-            match = re.search(r'\*(?:Critical|Warning|Info)(?:\s+[^*]+)?\*\s+([^"]+)', subject)
+            # Buscar patrones como "Est-FreCot *Critical* HTTPCode_ELB_5XX_Count del ELB: alb-asg-WSFrecuency-prod-pub"
+            # Primero intentamos extraer el nombre completo del servicio
+            match = re.search(r'\*(?:Critical|Warning|Info)[^*]*\*\s*([^(]*)\s*(?:\(([^)]*)\))?', subject)
             if match:
-                servicio_recurso = match.group(1).strip()
+                # Si hay un texto entre paréntesis, ese es el tipo de servicio
+                servicio_base = match.group(1).strip() if match.group(1) else ''
+                tipo_servicio = match.group(2).strip() if match.group(2) else ''
+                
+                if tipo_servicio:
+                    servicio_recurso = f"{servicio_base} ({tipo_servicio})"
+                else:
+                    servicio_recurso = servicio_base
         
         account_id = aws_account.group(1) if aws_account else ''
         
@@ -97,9 +103,12 @@ def crear_mensaje_correo(periodo, horas, df):
     return subject, message
 
 def generar_reporte(service, keyword, periodo='diario', horas=None):
-    print(f"\n📊 Generando reporte: {periodo.upper()} ({horas or 'Días'})")
+    print(f"📊 Generando reporte: {periodo.upper()} ({horas or 'Días'})")
 
     try:
+        # Asegurar que la tabla existe
+        crear_tabla_si_no_existe()
+        
         account_names = setup_aws()
         
         if periodo == 'custom' or periodo == 'diario':
@@ -121,9 +130,9 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
         if not df.empty:
             try:
                 resumen = (
-                    df.groupby(['Id cuenta', 'Nombre cuenta', 'Metrica', 'Estado'])
+                    df.groupby(['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio', 'Estado'])
                     .size().reset_index(name='Cantidad')
-                    .pivot_table(index=['Id cuenta', 'Nombre cuenta', 'Metrica'], 
+                    .pivot_table(index=['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio'], 
                                 columns='Estado', values='Cantidad', fill_value=0)
                     .reset_index()
                 )
@@ -166,7 +175,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
         print(f"⚠️ Error al enviar el correo: {e}")
 
 def main(periodo, keyword=REPORT_CONFIG["DEFAULT_KEYWORD"], horas_custom=None):
-    print("\n📈 === MONITOREO Y PERSPECTIVA AVANZADA ===\n")
+    print("\n📈 === MONITOREO Y PERSPECTIVA AVANZADA ===")
     print(f'Empezado: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     
     service = setup_gmail()

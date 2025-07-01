@@ -102,8 +102,8 @@ def generar_excel(df, resumen, periodo, horas=None):
         with pd.ExcelWriter(archivo, engine='openpyxl') as writer:
             # Detalle
             if not df.empty:
-                columnas = ['Id cuenta', 'Nombre cuenta', 'Metrica', 'Estado', 'Fecha_str']
-                for col in ['Región', 'Motivo']:
+                columnas = ['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio', 'Estado', 'Fecha_str']
+                for col in ['Región', 'Motivo', 'Namespace']:
                     if col in df.columns and df[col].notna().any():
                         columnas.append(col)
                 
@@ -111,6 +111,7 @@ def generar_excel(df, resumen, periodo, horas=None):
                     'Id cuenta': 'ID Cuenta', 
                     'Nombre cuenta': 'Nombre Cuenta', 
                     'Metrica': 'Métrica',
+                    'Servicio': 'Servicio/Recurso',
                     'Fecha_str': 'Fecha'
                 })
                 
@@ -209,13 +210,13 @@ def generar_excel(df, resumen, periodo, horas=None):
             # Resumen por cuenta
             if not resumen.empty:
                 # Título
-                ws2.cell(row=row_start, column=2, value="RESUMEN POR CUENTA Y MÉTRICA")
+                ws2.cell(row=row_start, column=2, value="RESUMEN POR CUENTA, MÉTRICA Y SERVICIO")
                 ws2.cell(row=row_start, column=2).font = Font(bold=True, size=14)
                 ws2.merge_cells(start_row=row_start, start_column=2, end_row=row_start, end_column=6)
                 ws2.cell(row=row_start, column=2).alignment = Alignment(horizontal='center')
                 
                 # Encabezados
-                headers = ['ID Cuenta', 'Nombre Cuenta', 'Métrica', 'Critica', 'Warning', 'Informativo', 'Total']
+                headers = ['ID Cuenta', 'Nombre Cuenta', 'Métrica', 'Servicio/Recurso', 'Critica', 'Warning', 'Informativo', 'Total']
                 for j, header in enumerate(headers):
                     ws2.cell(row=row_start+2, column=2+j, value=header)
                 
