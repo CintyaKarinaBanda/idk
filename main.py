@@ -8,7 +8,7 @@ import yagmail
 from functions.aws_manager import setup_aws
 from functions.gmail_manager import setup_gmail, get_emails 
 from functions.excel_manager import generar_excel
-from functions.db_manager import crear_tabla_si_no_existe, insertar_alertas, obtener_alertas_por_periodo
+from functions.db_manager import insertar_alertas, obtener_alertas_por_periodo
 from config import EMAIL_CONFIG, REPORT_CONFIG
 
 HORAS_CUSTOM = REPORT_CONFIG["HORAS_CUSTOM"]
