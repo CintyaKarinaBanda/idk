@@ -172,10 +172,10 @@ def generar_excel(df, resumen, periodo, horas=None):
             row_start = 13  # Después de recomendaciones
             
             # Análisis por servicio
-            if not df.empty and 'Namespace' in df.columns and df['Namespace'].notna().any():
+            if not df.empty and 'Servicio' in df.columns and df['Servicio'].notna().any():
                 try:
-                    servicios = df.groupby(['Namespace', 'Estado']).size().unstack(fill_value=0).reset_index()
-                    servicios = servicios.rename(columns={'Namespace': 'Servicio AWS'})
+                    servicios = df.groupby(['Servicio', 'Estado']).size().unstack(fill_value=0).reset_index()
+                    servicios = servicios.rename(columns={'Servicio': 'Servicio/Recurso'})
                     
                     for estado in ['Critica', 'Warning', 'Informativo']:
                         if estado not in servicios.columns:
@@ -185,13 +185,13 @@ def generar_excel(df, resumen, periodo, horas=None):
                     servicios = servicios.sort_values('Total', ascending=False)
                     
                     # Título
-                    ws2.cell(row=row_start, column=2, value="ANÁLISIS POR SERVICIO AWS")
+                    ws2.cell(row=row_start, column=2, value="ANÁLISIS POR SERVICIO/RECURSO")
                     ws2.cell(row=row_start, column=2).font = Font(bold=True, size=14)
                     ws2.merge_cells(start_row=row_start, start_column=2, end_row=row_start, end_column=6)
                     ws2.cell(row=row_start, column=2).alignment = Alignment(horizontal='center')
                     
                     # Encabezados
-                    headers = ['Servicio AWS', 'Critica', 'Warning', 'Informativo', 'Total']
+                    headers = ['Servicio/Recurso', 'Critica', 'Warning', 'Informativo', 'Total']
                     for j, header in enumerate(headers):
                         ws2.cell(row=row_start+2, column=2+j, value=header)
                     
