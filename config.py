@@ -7,8 +7,8 @@ AWS_CONFIG = {
 
 GMAIL_CONFIG = {
     "SCOPES": ['https://www.googleapis.com/auth/gmail.readonly'],
-    "TOKEN_PATH": '../credentials/token.json',
-    "CREDENTIALS_PATH": '../credentials/credentials.json'
+    "TOKEN_PATH": 'credentials/token.json',
+    "CREDENTIALS_PATH": 'credentials/credentials.json'
 }
 
 EMAIL_CONFIG = {

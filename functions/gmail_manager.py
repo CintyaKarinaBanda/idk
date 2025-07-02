@@ -12,7 +12,30 @@ def setup_gmail():
     token_path = GMAIL_CONFIG["TOKEN_PATH"]
     credentials_path = GMAIL_CONFIG["CREDENTIALS_PATH"]
     
-    # Ensure credential directory exists
+    # Buscar credenciales en múltiples ubicaciones posibles
+    possible_credential_paths = [
+        credentials_path,                      # Ruta configurada
+        'credentials/credentials.json',        # Directorio actual/credentials
+        '../credentials/credentials.json',     # Directorio superior/credentials
+        '/home/ec2-user/credentials/credentials.json'  # Ruta absoluta en EC2
+    ]
+    
+    # Encontrar la primera ruta válida
+    valid_credentials_path = None
+    for path in possible_credential_paths:
+        if os.path.exists(path):
+            valid_credentials_path = path
+            print(f"✅ Credenciales encontradas en: {path}")
+            break
+    
+    if not valid_credentials_path:
+        print("❌ No se encontraron credenciales en ninguna ubicación conocida")
+        print("Ubicaciones buscadas:")
+        for path in possible_credential_paths:
+            print(f"  - {path}")
+        raise FileNotFoundError("No se encontró el archivo de credenciales")
+    
+    # Ensure credential directory exists for token
     os.makedirs(os.path.dirname(token_path), exist_ok=True)
     
     if os.path.exists(token_path):
@@ -21,7 +44,7 @@ def setup_gmail():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(credentials_path, GMAIL_CONFIG["SCOPES"])
+            flow = InstalledAppFlow.from_client_secrets_file(valid_credentials_path, GMAIL_CONFIG["SCOPES"])
             creds = flow.run_local_server(port=0)
         with open(token_path, 'w') as token:
             token.write(creds.to_json())
