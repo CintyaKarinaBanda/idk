@@ -7,16 +7,16 @@ AWS_CONFIG = {
 
 GMAIL_CONFIG = {
     "SCOPES": ['https://www.googleapis.com/auth/gmail.readonly'],
-    "TOKEN_PATH": 'credentials/token.json',
-    "CREDENTIALS_PATH": 'credentials/credentials.json'
+    "TOKEN_PATH": '../credentials/token.json',
+    "CREDENTIALS_PATH": '../credentials/credentials.json'
 }
 
 EMAIL_CONFIG = {
     "REMITENTE": "karina.banda@xaldigital.com",
     "PASSWORD": "efci nhmi nzmj ipjk",
     "DESTINATARIO": "karina.banda@xaldigital.com",
-    "COPIAS": []
-    # Descomentado: "COPIAS": ['infraestructura@xaldigital.com', 'automation-nextgen@xaldigital.com']
+    #"COPIAS": []
+    "COPIAS": ['infraestructura@xaldigital.com', 'automation-nextgen@xaldigital.com']
 }
 
 REPORT_CONFIG = {
