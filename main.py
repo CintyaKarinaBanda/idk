@@ -126,9 +126,6 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
     print(f"📊 Generando reporte: {periodo.upper()} ({horas or 'Días'})")
 
     try:
-        # Asegurar que la tabla existe
-        crear_tabla_si_no_existe()
-        
         account_names = setup_aws()
         
         if periodo == 'custom' or periodo == 'diario':
@@ -149,6 +146,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
         resumen = pd.DataFrame()
         if not df.empty:
             try:
+                # Agrupar primero por cuenta y luego por métrica para el orden deseado
                 resumen = (
                     df.groupby(['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio', 'Estado'])
                     .size().reset_index(name='Cantidad')
@@ -156,6 +154,9 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
                                 columns='Estado', values='Cantidad', fill_value=0)
                     .reset_index()
                 )
+                
+                # Ordenar primero por cuenta y luego por métrica
+                resumen = resumen.sort_values(['Id cuenta', 'Nombre cuenta', 'Metrica'])
                 
                 for estado in ['Critica', 'Warning', 'Informativo']:
                     if estado not in resumen.columns:

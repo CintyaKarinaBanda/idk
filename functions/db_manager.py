@@ -18,40 +18,6 @@ def get_sqlalchemy_engine():
     """Obtiene un motor SQLAlchemy para operaciones con pandas"""
     return create_engine(f'postgresql://{DB_CONFIG["USER"]}:{DB_CONFIG["PASSWORD"]}@{DB_CONFIG["HOST"]}:{DB_CONFIG["PORT"]}/{DB_CONFIG["DATABASE"]}')
 
-def crear_tabla_si_no_existe():
-    """Crea la tabla de alertas si no existe"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    # Crear tabla de alertas
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS alertas (
-        id SERIAL PRIMARY KEY,
-        cuenta_id TEXT,
-        cuenta_nombre TEXT,
-        metrica TEXT,
-        servicio TEXT,
-        namespace TEXT,
-        estado TEXT,
-        fecha TIMESTAMP,
-        fecha_str TEXT
-    )
-    """)
-    
-    # Crear índice único para evitar duplicados
-    try:
-        cursor.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_alertas_unique 
-        ON alertas (cuenta_id, metrica, fecha)
-        """)
-    except Exception as e:
-        print(f"Nota: No se pudo crear el índice único: {e}")
-        # Continuar aunque no se pueda crear el índice
-    
-    conn.commit()
-    conn.close()
-    print("✅ Base de datos verificada/creada")
-
 def insertar_alertas(df):
     """Inserta las alertas del DataFrame en la base de datos, evitando duplicados"""
     if df.empty:

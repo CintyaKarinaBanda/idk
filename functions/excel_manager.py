@@ -67,6 +67,9 @@ def crear_grafico_circular(ws, row_start, resumen, chart_data):
     chart.height = EXCEL_STYLES["CHART_HEIGHT"]  # Altura en unidades
     chart.width = EXCEL_STYLES["CHART_WIDTH"]   # Ancho en unidades
     
+    # Definir colores para cada tipo de alerta (rojo para críticos, amarillo para warnings, azul para info)
+    # Nota: Los colores se aplican en el orden en que aparecen los datos
+    
     # Referencias a los datos y etiquetas
     data_ref = Reference(ws, min_col=3, max_col=3, 
                        min_row=row_start+len(resumen)+6, 
@@ -78,6 +81,12 @@ def crear_grafico_circular(ws, row_start, resumen, chart_data):
     # Configurar el gráfico
     chart.add_data(data_ref)
     chart.set_categories(labels_ref)
+    
+    # Aplicar colores personalizados a las series
+    # En gráficos circulares, cada porción es una serie diferente
+    for i, serie in enumerate(chart.series):
+        if i < len(EXCEL_STYLES["CHART_COLORS"]):
+            serie.graphicalProperties.solidFill = EXCEL_STYLES["CHART_COLORS"][i]
     
     # Mostrar porcentajes en las etiquetas
     chart.dataLabels = DataLabelList()
@@ -162,8 +171,8 @@ def generar_excel(df, resumen, periodo, horas=None):
                         top=Side(style='thin'), bottom=Side(style='thin')
                     )
             
-            # Recomendaciones
-            ws2.cell(row=8, column=2, value="RECOMENDACIONES:")
+            # Notas (antes Recomendaciones)
+            ws2.cell(row=8, column=2, value="NOTAS:")
             ws2.cell(row=8, column=2).font = Font(bold=True)
             
             for i, rec in enumerate(generar_recomendaciones(df)[:3]):
@@ -220,10 +229,21 @@ def generar_excel(df, resumen, periodo, horas=None):
                 for j, header in enumerate(headers):
                     ws2.cell(row=row_start+2, column=2+j, value=header)
                 
-                # Datos
+                # Datos con sangría para métricas
+                current_account = None
                 for i, row in enumerate(resumen.itertuples(index=False)):
                     for j, val in enumerate(row):
-                        ws2.cell(row=row_start+3+i, column=2+j, value=val)
+                        cell = ws2.cell(row=row_start+3+i, column=2+j)
+                        
+                        # Añadir sangría a las métricas y servicios
+                        if j == 2:  # Índice de la columna Métrica
+                            cell.value = f"    {val}"  # Añadir sangría
+                            cell.alignment = Alignment(horizontal='left', vertical='center')
+                        elif j == 3:  # Índice de la columna Servicio
+                            cell.value = f"        {val}"  # Añadir sangría doble
+                            cell.alignment = Alignment(horizontal='left', vertical='center')
+                        else:
+                            cell.value = val
                 
                 aplicar_formato(ws2, [row_start+2, row_start+3+len(resumen)-1], 
                                [2, 2+len(headers)-1])
@@ -231,14 +251,15 @@ def generar_excel(df, resumen, periodo, horas=None):
                 # Gráfico circular
                 if all(col in resumen.columns for col in ['Critica', 'Warning', 'Informativo']):
                     try:
-                        # Datos para gráfico - solo incluir valores > 0
+                        # Datos para gráfico - mantener orden específico para los colores
+                        # El orden es importante: Críticas (rojo), Warnings (amarillo), Informativas (azul)
                         chart_data = []
-                        if criticas > 0:
-                            chart_data.append(("Críticas", criticas))
-                        if warnings > 0:
-                            chart_data.append(("Warnings", warnings))
-                        if info > 0:
-                            chart_data.append(("Informativas", info))
+                        # Siempre incluir las tres categorías en el mismo orden para mantener los colores consistentes
+                        chart_data.append(("Críticas", criticas))
+                        chart_data.append(("Warnings", warnings))
+                        chart_data.append(("Informativas", info))
+                        # Filtrar después los que tienen valor 0
+                        chart_data = [(label, value) for label, value in chart_data if value > 0]
                         
                         # Escribir encabezados
                         ws2.cell(row=row_start+len(resumen)+5, column=2, value="Estado")
