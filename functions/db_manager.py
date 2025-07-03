@@ -100,6 +100,46 @@ def crear_tabla_si_no_existe():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_alertas_fecha ON alertas (fecha)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_alertas_cuenta ON alertas (cuenta_id)")
     
+    # Verificar si hay datos en la tabla
+    cursor.execute("SELECT COUNT(*) FROM alertas")
+    count = cursor.fetchone()[0]
+    
+    # Si no hay datos, insertar algunos datos de ejemplo
+    if count == 0:
+        print("ℹ️ No hay datos en la tabla de alertas. Insertando datos de ejemplo...")
+        
+        # Fechas para los últimos 30 días
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        
+        # Insertar algunos datos de ejemplo
+        example_data = [
+            # Alertas críticas
+            ("883278715161", "Estafeta Prod", "CPUUtilization", "Servidor Web", "AWS/EC2", "Critica", now - timedelta(days=2), (now - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S')),
+            ("883278715161", "Estafeta Prod", "CPUUtilization", "Servidor Web", "AWS/EC2", "Critica", now - timedelta(days=5), (now - timedelta(days=5)).strftime('%Y-%m-%d %H:%M:%S')),
+            ("883278715161", "Estafeta Prod", "MemoryUtilization", "Base de Datos", "AWS/RDS", "Critica", now - timedelta(days=7), (now - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')),
+            
+            # Alertas warning
+            ("883278715161", "Estafeta Prod", "DiskSpaceUtilization", "Servidor Web", "AWS/EC2", "Warning", now - timedelta(days=3), (now - timedelta(days=3)).strftime('%Y-%m-%d %H:%M:%S')),
+            ("883278715161", "Estafeta Prod", "DiskSpaceUtilization", "Servidor Web", "AWS/EC2", "Warning", now - timedelta(days=10), (now - timedelta(days=10)).strftime('%Y-%m-%d %H:%M:%S')),
+            ("883278715161", "Estafeta Prod", "ConnectionCount", "Base de Datos", "AWS/RDS", "Warning", now - timedelta(days=15), (now - timedelta(days=15)).strftime('%Y-%m-%d %H:%M:%S')),
+            
+            # Alertas informativas
+            ("883278715161", "Estafeta Prod", "RequestCount", "API Gateway", "AWS/ApiGateway", "Informativo", now - timedelta(days=1), (now - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')),
+            ("883278715161", "Estafeta Prod", "RequestCount", "API Gateway", "AWS/ApiGateway", "Informativo", now - timedelta(days=8), (now - timedelta(days=8)).strftime('%Y-%m-%d %H:%M:%S')),
+            ("883278715161", "Estafeta Prod", "NetworkIn", "Servidor Web", "AWS/EC2", "Informativo", now - timedelta(days=12), (now - timedelta(days=12)).strftime('%Y-%m-%d %H:%M:%S')),
+        ]
+        
+        for data in example_data:
+            cursor.execute("""
+            INSERT INTO alertas (cuenta_id, cuenta_nombre, metrica, servicio, namespace, estado, fecha, fecha_str)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, data)
+        
+        print(f"✅ {len(example_data)} alertas de ejemplo insertadas en la base de datos")
+    else:
+        print(f"✅ La tabla de alertas contiene {count} registros")
+    
     conn.commit()
     conn.close()
     print("✅ Tabla de alertas verificada/creada correctamente")
@@ -137,7 +177,12 @@ def obtener_alertas_por_periodo(periodo, horas=None):
     
     df = pd.read_sql_query(query, engine)
     
-    print(f"✅ {len(df)} alertas recuperadas de la base de datos")
-    print(f"  Periodo: {periodo} {f'({horas} horas)' if horas else ''}")
-    print(f"  Rango: {fecha_inicio_str} a {fecha_fin_str}")
+    if len(df) == 0:
+        print("⚠️ No se encontraron alertas en la base de datos para el periodo especificado")
+        print(f"  Periodo: {periodo} {f'({horas} horas)' if horas else ''}")
+        print(f"  Rango: {fecha_inicio_str} a {fecha_fin_str}")
+    else:
+        print(f"✅ {len(df)} alertas recuperadas de la base de datos")
+        print(f"  Periodo: {periodo} {f'({horas} horas)' if horas else ''}")
+        print(f"  Rango: {fecha_inicio_str} a {fecha_fin_str}")
     return df
