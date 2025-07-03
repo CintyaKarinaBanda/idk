@@ -40,9 +40,9 @@ EXCEL_STYLES = {
     "HEADER_FONT_COLOR": "FFFFFF",
     "CRITICAL_COLOR": "FF0000",  # Rojo
     "WARNING_COLOR": "FFA500",   # Amarillo/Naranja
-    "INFO_COLOR": "0000FF",      # Azul
+    "INFO_COLOR": "00B050",      # Verde
     "CHART_STYLE": 10,
     "CHART_HEIGHT": 10,
     "CHART_WIDTH": 10,
-    "CHART_COLORS": ["FF0000", "FFA500", "0000FF"]  # Colores para el gráfico: Rojo, Amarillo, Azul
+    "CHART_COLORS": ["FF0000", "FFA500", "00B050"]  # Colores para el gráfico: Rojo, Amarillo, Verde
 }
