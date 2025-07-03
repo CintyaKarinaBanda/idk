@@ -8,7 +8,7 @@ import yagmail
 from functions.aws_manager import setup_aws
 from functions.gmail_manager import setup_gmail, get_emails 
 from functions.excel_manager import generar_excel
-from functions.db_manager import insertar_alertas, obtener_alertas_por_periodo, crear_tabla_si_no_existe
+from functions.db_manager import insertar_alertas, obtener_alertas_por_periodo
 from config import EMAIL_CONFIG, REPORT_CONFIG
 
 HORAS_CUSTOM = REPORT_CONFIG["HORAS_CUSTOM"]
@@ -218,11 +218,7 @@ def main(periodo, keyword=REPORT_CONFIG["DEFAULT_KEYWORD"], horas_custom=None):
     print("\n📈 === MONITOREO Y PERSPECTIVA AVANZADA ===")
     print(f'Empezado: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     
-    # Asegurarse de que la tabla de alertas existe
-    try:
-        crear_tabla_si_no_existe()
-    except Exception as e:
-        print(f"❌ Error al verificar/crear tabla de alertas: {e}")
+    # Simplemente continuar con el proceso sin verificaciones adicionales
     
     # Intentar configurar Gmail, pero continuar si falla
     try:

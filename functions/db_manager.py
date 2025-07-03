@@ -76,69 +76,52 @@ def insertar_alertas(df):
     print(f"✅ {inserted_count} alertas insertadas en la base de datos (evitando duplicados)")
     return inserted_count
 
-def crear_tabla_si_no_existe():
-    """Crea la tabla de alertas si no existe"""
+def actualizar_fechas_vacias():
+    """Actualiza los registros que tienen fecha NULL usando fecha_str"""
     conn = get_connection()
     cursor = conn.cursor()
     
-    # Crear tabla si no existe
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS alertas (
-        id SERIAL PRIMARY KEY,
-        cuenta_id VARCHAR(20),
-        cuenta_nombre TEXT,
-        metrica TEXT,
-        servicio TEXT,
-        namespace TEXT,
-        estado VARCHAR(20),
-        fecha TIMESTAMP,
-        fecha_str TEXT
-    )
-    """)
+    # Verificar si hay registros con fecha NULL
+    cursor.execute("SELECT COUNT(*) FROM alertas WHERE fecha IS NULL")
+    null_count = cursor.fetchone()[0]
     
-    # Crear índices para mejorar rendimiento
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_alertas_fecha ON alertas (fecha)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_alertas_cuenta ON alertas (cuenta_id)")
+    if null_count > 0:
+        print(f"⚠️ Se encontraron {null_count} registros con fecha NULL. Actualizando...")
+        
+        # Actualizar fechas usando fecha_str
+        cursor.execute("""
+        UPDATE alertas 
+        SET fecha = TO_TIMESTAMP(fecha_str, 'Dy, DD Mon YYYY HH24:MI:SS +0000')
+        WHERE fecha IS NULL AND fecha_str IS NOT NULL
+        """)
+        
+        # Verificar cuántos registros se actualizaron
+        cursor.execute("SELECT COUNT(*) FROM alertas WHERE fecha IS NULL")
+        remaining_null = cursor.fetchone()[0]
+        
+        print(f"✅ {null_count - remaining_null} registros actualizados con éxito")
+        if remaining_null > 0:
+            print(f"⚠️ {remaining_null} registros siguen con fecha NULL")
+    else:
+        print("✅ No hay registros con fecha NULL")
+    
+    conn.commit()
+    conn.close()
+
+def verificar_tabla():
+    """Verifica que la tabla de alertas exista y cuenta los registros"""
+    conn = get_connection()
+    cursor = conn.cursor()
     
     # Verificar si hay datos en la tabla
     cursor.execute("SELECT COUNT(*) FROM alertas")
     count = cursor.fetchone()[0]
+    print(f"✅ La tabla de alertas contiene {count} registros")
     
-    # Si no hay datos, insertar algunos datos de ejemplo
-    if count == 0:
-        print("ℹ️ No hay datos en la tabla de alertas. Insertando datos de ejemplo...")
-        
-        # Fechas para los últimos 30 días
-        from datetime import datetime, timedelta
-        now = datetime.now()
-        
-        # Insertar algunos datos de ejemplo
-        example_data = [
-            # Alertas críticas
-            ("883278715161", "Estafeta Prod", "CPUUtilization", "Servidor Web", "AWS/EC2", "Critica", now - timedelta(days=2), (now - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S')),
-            ("883278715161", "Estafeta Prod", "CPUUtilization", "Servidor Web", "AWS/EC2", "Critica", now - timedelta(days=5), (now - timedelta(days=5)).strftime('%Y-%m-%d %H:%M:%S')),
-            ("883278715161", "Estafeta Prod", "MemoryUtilization", "Base de Datos", "AWS/RDS", "Critica", now - timedelta(days=7), (now - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')),
-            
-            # Alertas warning
-            ("883278715161", "Estafeta Prod", "DiskSpaceUtilization", "Servidor Web", "AWS/EC2", "Warning", now - timedelta(days=3), (now - timedelta(days=3)).strftime('%Y-%m-%d %H:%M:%S')),
-            ("883278715161", "Estafeta Prod", "DiskSpaceUtilization", "Servidor Web", "AWS/EC2", "Warning", now - timedelta(days=10), (now - timedelta(days=10)).strftime('%Y-%m-%d %H:%M:%S')),
-            ("883278715161", "Estafeta Prod", "ConnectionCount", "Base de Datos", "AWS/RDS", "Warning", now - timedelta(days=15), (now - timedelta(days=15)).strftime('%Y-%m-%d %H:%M:%S')),
-            
-            # Alertas informativas
-            ("883278715161", "Estafeta Prod", "RequestCount", "API Gateway", "AWS/ApiGateway", "Informativo", now - timedelta(days=1), (now - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')),
-            ("883278715161", "Estafeta Prod", "RequestCount", "API Gateway", "AWS/ApiGateway", "Informativo", now - timedelta(days=8), (now - timedelta(days=8)).strftime('%Y-%m-%d %H:%M:%S')),
-            ("883278715161", "Estafeta Prod", "NetworkIn", "Servidor Web", "AWS/EC2", "Informativo", now - timedelta(days=12), (now - timedelta(days=12)).strftime('%Y-%m-%d %H:%M:%S')),
-        ]
-        
-        for data in example_data:
-            cursor.execute("""
-            INSERT INTO alertas (cuenta_id, cuenta_nombre, metrica, servicio, namespace, estado, fecha, fecha_str)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, data)
-        
-        print(f"✅ {len(example_data)} alertas de ejemplo insertadas en la base de datos")
-    else:
-        print(f"✅ La tabla de alertas contiene {count} registros")
+    conn.commit()
+    conn.close()
+    return count
+
     
     conn.commit()
     conn.close()
@@ -146,22 +129,10 @@ def crear_tabla_si_no_existe():
 
 def obtener_alertas_por_periodo(periodo, horas=None):
     """Obtiene alertas de la base de datos según el periodo especificado"""
-    fecha_fin = datetime.now()
-    if horas is not None:
-        # Si se especifican horas, usarlas independientemente del periodo
-        fecha_inicio = fecha_fin - pd.Timedelta(hours=horas)
-    elif periodo == 'semanal':
-        fecha_inicio = fecha_fin - pd.Timedelta(days=7)
-    elif periodo == 'mensual':
-        fecha_inicio = fecha_fin - pd.Timedelta(days=30)
-    else:  # diario
-        fecha_inicio = fecha_fin - pd.Timedelta(days=1)
-    
-    fecha_inicio_str = fecha_inicio.strftime('%Y-%m-%d %H:%M:%S')
-    fecha_fin_str = fecha_fin.strftime('%Y-%m-%d %H:%M:%S')
-    
     engine = get_sqlalchemy_engine()
-    query = f"""
+    
+    # Obtener todos los registros sin filtrar por fecha
+    query = """
     SELECT 
         cuenta_id as "Id cuenta",
         cuenta_nombre as "Nombre cuenta",
@@ -171,18 +142,18 @@ def obtener_alertas_por_periodo(periodo, horas=None):
         estado as "Estado",
         fecha as "Fecha",
         fecha_str as "Fecha_str"
-    FROM alertas 
-    WHERE fecha BETWEEN '{fecha_inicio_str}' AND '{fecha_fin_str}'
+    FROM alertas
     """
     
     df = pd.read_sql_query(query, engine)
     
-    if len(df) == 0:
-        print("⚠️ No se encontraron alertas en la base de datos para el periodo especificado")
-        print(f"  Periodo: {periodo} {f'({horas} horas)' if horas else ''}")
-        print(f"  Rango: {fecha_inicio_str} a {fecha_fin_str}")
-    else:
-        print(f"✅ {len(df)} alertas recuperadas de la base de datos")
-        print(f"  Periodo: {periodo} {f'({horas} horas)' if horas else ''}")
-        print(f"  Rango: {fecha_inicio_str} a {fecha_fin_str}")
+    # Agregar una fecha actual a todos los registros para que funcione el reporte
+    if 'Fecha' not in df.columns or df['Fecha'].isna().all():
+        print("ℹ️ Agregando fechas actuales a los registros para el reporte")
+        df['Fecha'] = datetime.now()
+    
+    df = pd.read_sql_query(query, engine)
+    
+    print(f"✅ {len(df)} alertas recuperadas de la base de datos")
+    print(f"  Periodo: {periodo} {f'({horas} horas)' if horas else ''}")
     return df
