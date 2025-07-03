@@ -67,9 +67,6 @@ def crear_grafico_circular(ws, row_start, resumen, chart_data):
     chart.height = EXCEL_STYLES["CHART_HEIGHT"]  # Altura en unidades
     chart.width = EXCEL_STYLES["CHART_WIDTH"]   # Ancho en unidades
     
-    # Definir colores para cada tipo de alerta (rojo para críticos, amarillo para warnings, azul para info)
-    # Nota: Los colores se aplican en el orden en que aparecen los datos
-    
     # Referencias a los datos y etiquetas
     data_ref = Reference(ws, min_col=3, max_col=3, 
                        min_row=row_start+len(resumen)+6, 
@@ -82,11 +79,23 @@ def crear_grafico_circular(ws, row_start, resumen, chart_data):
     chart.add_data(data_ref)
     chart.set_categories(labels_ref)
     
-    # Aplicar colores personalizados a las series
-    # En gráficos circulares, cada porción es una serie diferente
-    for i, serie in enumerate(chart.series):
-        if i < len(EXCEL_STYLES["CHART_COLORS"]):
-            serie.graphicalProperties.solidFill = EXCEL_STYLES["CHART_COLORS"][i]
+    # Asignar colores específicos a cada categoría
+    from openpyxl.chart.series import Series
+    
+    # Mapeo de etiquetas a colores
+    color_map = {
+        "Críticas": "FF0000",  # Rojo
+        "Warnings": "FFA500",  # Amarillo/Naranja
+        "Informativas": "00B050"  # Verde
+    }
+    
+    # Obtener las etiquetas de las categorías
+    categories = [ws.cell(row=row_start+len(resumen)+6+i, column=2).value for i in range(len(chart_data))]
+    
+    # Aplicar colores según la categoría
+    for i, cat in enumerate(categories):
+        if cat in color_map:
+            chart.series[0].data_points[i].graphicalProperties.solidFill = color_map[cat]
     
     # Mostrar porcentajes en las etiquetas
     chart.dataLabels = DataLabelList()
