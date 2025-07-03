@@ -8,7 +8,7 @@ import yagmail
 from functions.aws_manager import setup_aws
 from functions.gmail_manager import setup_gmail, get_emails 
 from functions.excel_manager import generar_excel
-from functions.db_manager import insertar_alertas, obtener_alertas_por_periodo
+from functions.db_manager import insertar_alertas, obtener_alertas_por_periodo, crear_tabla_si_no_existe
 from config import EMAIL_CONFIG, REPORT_CONFIG
 
 HORAS_CUSTOM = REPORT_CONFIG["HORAS_CUSTOM"]
@@ -146,7 +146,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
                 insertar_alertas(df)
         else:
             # Si no hay servicio de Gmail o es otro periodo, usar la base de datos
-            df = obtener_alertas_por_periodo(periodo)
+            df = obtener_alertas_por_periodo(periodo, horas)
             if df.empty and service is None:
                 print("⚠️ No se pudieron obtener alertas de Gmail ni de la base de datos")
                 print("ℹ️ Generando reporte con datos de ejemplo para pruebas")
@@ -218,7 +218,19 @@ def main(periodo, keyword=REPORT_CONFIG["DEFAULT_KEYWORD"], horas_custom=None):
     print("\n📈 === MONITOREO Y PERSPECTIVA AVANZADA ===")
     print(f'Empezado: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     
-    service = setup_gmail()
+    # Asegurarse de que la tabla de alertas existe
+    try:
+        crear_tabla_si_no_existe()
+    except Exception as e:
+        print(f"❌ Error al verificar/crear tabla de alertas: {e}")
+    
+    # Intentar configurar Gmail, pero continuar si falla
+    try:
+        service = setup_gmail()
+    except Exception as e:
+        print(f"⚠️ Error al configurar Gmail: {e}")
+        print("ℹ️ Continuando sin acceso a Gmail (usando datos de la base de datos)")
+        service = None
     
     # Determinar las horas para el periodo personalizado
     horas = horas_custom if horas_custom else HORAS_CUSTOM if periodo == 'custom' else None
