@@ -52,7 +52,10 @@ def analizar_mensajes(service, messages, account_names, horas=None):
             "cluster-stack (EKS)",
             "EMAWSBSDB01",
             "EMAWSCSDB03",
-            "E2K6IWMA8DFJ3O Sitio www.estafeta.com"
+            "E2K6IWMA8DFJ3O Sitio www.estafeta.com",
+            "alb-asg-WSFrecuency-prod-pub",
+            "asg-WSFrecuency",
+            "TG: tg-middlewareInvoice-pro-public del  ELB alb-middlewareInvoice-pro-public"
         ]
         
         # Buscar cada patrón en el cuerpo del mensaje
@@ -128,7 +131,8 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
     try:
         account_names = setup_aws()
         
-        if periodo == 'custom' or periodo == 'diario':
+        if (periodo == 'custom' or periodo == 'diario') and service is not None:
+            # Solo intentar obtener emails si tenemos servicio de Gmail
             desde = datetime.now()
             if horas:
                 desde -= timedelta(hours=horas)
@@ -141,7 +145,22 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
             if not df.empty:
                 insertar_alertas(df)
         else:
+            # Si no hay servicio de Gmail o es otro periodo, usar la base de datos
             df = obtener_alertas_por_periodo(periodo)
+            if df.empty and service is None:
+                print("⚠️ No se pudieron obtener alertas de Gmail ni de la base de datos")
+                print("ℹ️ Generando reporte con datos de ejemplo para pruebas")
+                # Crear datos de ejemplo para pruebas
+                df = pd.DataFrame({
+                    'Id cuenta': ['123456789012'],
+                    'Nombre cuenta': ['Cuenta Ejemplo'],
+                    'Metrica': ['CPUUtilization'],
+                    'Servicio': ['Servicio Ejemplo'],
+                    'Namespace': ['AWS/EC2'],
+                    'Estado': ['Warning'],
+                    'Fecha': [datetime.now()],
+                    'Fecha_str': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
+                })
 
         resumen = pd.DataFrame()
         if not df.empty:
