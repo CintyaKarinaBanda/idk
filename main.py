@@ -32,14 +32,9 @@ def analizar_mensajes(service, messages, account_names, horas=None):
                     continue
             fecha_str = fecha_dt.strftime('%Y-%m-%d %H:%M:%S')
         except:
-            # Si no se puede parsear la fecha y hay filtro de horas, saltar
-            if horas:
-                continue
             fecha_str = fecha_raw
             fecha_dt = None
 
-        # Extraer cuerpo del mensaje
-        body = ''
         payload = msg_data['payload']
         if 'parts' in payload:
             parts = [p for p in payload['parts'] if p['mimeType'] == 'text/plain']
@@ -54,10 +49,18 @@ def analizar_mensajes(service, messages, account_names, horas=None):
         metric_name = re.search(r'MetricName:\s+([^\s,]+)', body)
         namespace = re.search(r'Namespace:\s+([^\s,]+)', body)
         
-        # Extraer servicio
-        servicio_recurso = ''
-        patrones_servicio = ["cluster-stack (EKS)", "EMAWSBSDB01", "EMAWSCSDB03", "E2K6IWMA8DFJ3O", "alb-asg-WSFrecuency"]
+        patrones_servicio = [
+            "cluster-stack (EKS)",
+            "EMAWSBSDB01",
+            "EMAWSCSDB03",
+            "E2K6IWMA8DFJ3O Sitio www.estafeta.com",
+            "alb-asg-WSFrecuency-prod-pub",
+            "asg-WSFrecuency",
+            "TG: tg-middlewareInvoice-pro-public del  ELB alb-middlewareInvoice-pro-public"
+        ]
         
+        # Buscar cada patrón en el cuerpo del mensaje
+        servicio_recurso = ''
         for patron in patrones_servicio:
             if patron in body:
                 servicio_recurso = patron
@@ -130,53 +133,35 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
         account_names = setup_aws()
         
         if (periodo == 'custom' or periodo == 'diario') and service is not None:
-            ahora = datetime.now()
-            if periodo == 'custom' and horas:
-                desde = ahora - timedelta(hours=horas)
-                print(f"🕐 Filtrando alertas desde: {desde.strftime('%Y-%m-%d %H:%M:%S')} hasta: {ahora.strftime('%Y-%m-%d %H:%M:%S')}")
-            else:
-                desde = ahora - timedelta(days=1)
+            # Solo intentar obtener emails si tenemos servicio de Gmail
+            desde = datetime.now()
+            if horas:
+                desde -= timedelta(hours=horas)
+            else: 
+                desde -= timedelta(days=1)
                 
             messages = get_emails(service, keyword, desde)
-            print(f"📧 Mensajes obtenidos: {len(messages)}")
-            
             df = analizar_mensajes(service, messages, account_names, horas)
-            print(f"📊 DataFrame inicial: {len(df)} filas")
-            if len(messages) > 0 and df.empty:
-                print("⚠️ Todos los mensajes fueron filtrados - revisando filtro de horas")
-                # Probar sin filtro de horas para debug
-                df_debug = analizar_mensajes(service, messages[:3], account_names, None)
-                print(f"🔍 Sin filtro de horas: {len(df_debug)} filas")
-            
-            # Filtro adicional para periodo custom
-            if not df.empty and periodo == 'custom' and horas:
-                antes_filtro = len(df)
-                df = df[df['Fecha'] >= desde]
-                print(f"📅 Alertas antes del filtro: {antes_filtro}, después: {len(df)}")
             
             if not df.empty:
-                print(f"💾 Insertando {len(df)} alertas en BD")
                 insertar_alertas(df)
-            else:
-                print("⚠️ No hay alertas para insertar")
         else:
-            print("📊 Obteniendo alertas de la base de datos")
+            # Si no hay servicio de Gmail o es otro periodo, usar la base de datos
             df = obtener_alertas_por_periodo(periodo, horas)
-            print(f"💾 Alertas de BD: {len(df)}")
-            
-        # Si no hay datos, crear DataFrame vacío con estructura correcta
-        if df.empty:
-            print("⚠️ No hay alertas, creando DataFrame vacío")
-            df = pd.DataFrame({
-                'Id cuenta': [],
-                'Nombre cuenta': [],
-                'Metrica': [],
-                'Servicio': [],
-                'Namespace': [],
-                'Estado': [],
-                'Fecha': [],
-                'Fecha_str': []
-            })
+            if df.empty and service is None:
+                print("⚠️ No se pudieron obtener alertas de Gmail ni de la base de datos")
+                print("ℹ️ Generando reporte con datos de ejemplo para pruebas")
+                # Crear datos de ejemplo para pruebas
+                df = pd.DataFrame({
+                    'Id cuenta': ['123456789012'],
+                    'Nombre cuenta': ['Cuenta Ejemplo'],
+                    'Metrica': ['CPUUtilization'],
+                    'Servicio': ['Servicio Ejemplo'],
+                    'Namespace': ['AWS/EC2'],
+                    'Estado': ['Warning'],
+                    'Fecha': [datetime.now()],
+                    'Fecha_str': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
+                })
 
         resumen = pd.DataFrame()
         if not df.empty:
@@ -202,7 +187,6 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
             except Exception as e:
                 print(f"Error al crear resumen: {e}")
 
-        print(f"📈 Generando Excel con {len(df)} alertas y {len(resumen)} filas de resumen")
         if generar_excel(df, resumen, periodo, horas):
             print(f"✅ {len(df)} alertas exportadas")
         else:
@@ -214,8 +198,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
 
     try:
         sufijo = f"_ultimas_{horas}h" if horas else ""
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        nombre_archivo = f'Alertas_{periodo}{sufijo}_{timestamp}.xlsx'
+        nombre_archivo = f'Alertas_{periodo}{sufijo}.xlsx'
         archivo_adjunto = os.path.join(os.getcwd(), REPORT_CONFIG["EXCEL_DIR"], nombre_archivo)
         
         subject, message = crear_mensaje_correo(periodo, horas, df)
@@ -226,7 +209,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
             subject=subject,
             contents=message,
             cc=EMAIL_CONFIG["COPIAS"],
-            attachments=[archivo_adjunto]
+            attachments=archivo_adjunto
         )
         print(f"✅ Reporte enviado a {EMAIL_CONFIG['DESTINATARIO']} y {len(EMAIL_CONFIG['COPIAS'])} destinatarios en copia")
     except Exception as e:
@@ -248,10 +231,6 @@ def main(periodo, keyword=REPORT_CONFIG["DEFAULT_KEYWORD"], horas_custom=None):
     
     # Determinar las horas para el periodo personalizado
     horas = horas_custom if horas_custom else HORAS_CUSTOM if periodo == 'custom' else None
-    
-    if periodo == 'custom' and horas:
-        print(f"⏰ Configurado para últimas {horas} horas exactas")
-    
     generar_reporte(service, keyword, periodo, horas)
 
     print("✅ Reportes generados con éxito. Incluyen")
