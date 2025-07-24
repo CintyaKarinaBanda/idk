@@ -142,6 +142,11 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
             
             df = analizar_mensajes(service, messages, account_names, horas)
             print(f"📊 DataFrame inicial: {len(df)} filas")
+            if len(messages) > 0 and df.empty:
+                print("⚠️ Todos los mensajes fueron filtrados - revisando filtro de horas")
+                # Probar sin filtro de horas para debug
+                df_debug = analizar_mensajes(service, messages[:3], account_names, None)
+                print(f"🔍 Sin filtro de horas: {len(df_debug)} filas")
             
             # Filtro adicional para periodo custom
             if not df.empty and periodo == 'custom' and horas:
@@ -221,7 +226,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
             subject=subject,
             contents=message,
             cc=EMAIL_CONFIG["COPIAS"],
-            attachments=archivo_adjunto
+            attachments=[archivo_adjunto]
         )
         print(f"✅ Reporte enviado a {EMAIL_CONFIG['DESTINATARIO']} y {len(EMAIL_CONFIG['COPIAS'])} destinatarios en copia")
     except Exception as e:
