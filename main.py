@@ -138,7 +138,10 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
                 desde = ahora - timedelta(days=1)
                 
             messages = get_emails(service, keyword, desde)
+            print(f"📧 Mensajes obtenidos: {len(messages)}")
+            
             df = analizar_mensajes(service, messages, account_names, horas)
+            print(f"📊 DataFrame inicial: {len(df)} filas")
             
             # Filtro adicional para periodo custom
             if not df.empty and periodo == 'custom' and horas:
@@ -147,24 +150,28 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
                 print(f"📅 Alertas antes del filtro: {antes_filtro}, después: {len(df)}")
             
             if not df.empty:
+                print(f"💾 Insertando {len(df)} alertas en BD")
                 insertar_alertas(df)
+            else:
+                print("⚠️ No hay alertas para insertar")
         else:
-            # Si no hay servicio de Gmail o es otro periodo, usar la base de datos
+            print("📊 Obteniendo alertas de la base de datos")
             df = obtener_alertas_por_periodo(periodo, horas)
-            if df.empty and service is None:
-                print("⚠️ No se pudieron obtener alertas de Gmail ni de la base de datos")
-                print("ℹ️ Generando reporte con datos de ejemplo para pruebas")
-                # Crear datos de ejemplo para pruebas
-                df = pd.DataFrame({
-                    'Id cuenta': ['123456789012'],
-                    'Nombre cuenta': ['Cuenta Ejemplo'],
-                    'Metrica': ['CPUUtilization'],
-                    'Servicio': ['Servicio Ejemplo'],
-                    'Namespace': ['AWS/EC2'],
-                    'Estado': ['Warning'],
-                    'Fecha': [datetime.now()],
-                    'Fecha_str': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
-                })
+            print(f"💾 Alertas de BD: {len(df)}")
+            
+        # Si no hay datos, crear DataFrame vacío con estructura correcta
+        if df.empty:
+            print("⚠️ No hay alertas, creando DataFrame vacío")
+            df = pd.DataFrame({
+                'Id cuenta': [],
+                'Nombre cuenta': [],
+                'Metrica': [],
+                'Servicio': [],
+                'Namespace': [],
+                'Estado': [],
+                'Fecha': [],
+                'Fecha_str': []
+            })
 
         resumen = pd.DataFrame()
         if not df.empty:
@@ -190,6 +197,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
             except Exception as e:
                 print(f"Error al crear resumen: {e}")
 
+        print(f"📈 Generando Excel con {len(df)} alertas y {len(resumen)} filas de resumen")
         if generar_excel(df, resumen, periodo, horas):
             print(f"✅ {len(df)} alertas exportadas")
         else:
@@ -201,7 +209,8 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
 
     try:
         sufijo = f"_ultimas_{horas}h" if horas else ""
-        nombre_archivo = f'Alertas_{periodo}{sufijo}.xlsx'
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        nombre_archivo = f'Alertas_{periodo}{sufijo}_{timestamp}.xlsx'
         archivo_adjunto = os.path.join(os.getcwd(), REPORT_CONFIG["EXCEL_DIR"], nombre_archivo)
         
         subject, message = crear_mensaje_correo(periodo, horas, df)
