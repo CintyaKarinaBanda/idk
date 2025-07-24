@@ -25,41 +25,39 @@ def analizar_mensajes(service, messages, account_names, horas=None):
 
         try:
             fecha_dt = parsedate_to_datetime(fecha_raw).astimezone()
-            if horas and fecha_dt < ahora - timedelta(hours=horas):
-                continue
+            # Filtro exacto: solo incluir si está dentro del rango de horas
+            if horas:
+                limite_tiempo = ahora - timedelta(hours=horas)
+                if fecha_dt < limite_tiempo:
+                    continue
             fecha_str = fecha_dt.strftime('%Y-%m-%d %H:%M:%S')
         except:
+            # Si no se puede parsear la fecha y hay filtro de horas, saltar
+            if horas:
+                continue
             fecha_str = fecha_raw
             fecha_dt = None
 
+        # Extraer cuerpo del mensaje
+        body = ''
         payload = msg_data['payload']
         if 'parts' in payload:
             parts = [p for p in payload['parts'] if p['mimeType'] == 'text/plain']
-            body = base64.urlsafe_b64decode(parts[0]['body']['data']).decode() if parts else ''
-        else:
-            body = base64.urlsafe_b64decode(payload['body']['data']).decode()
+            if parts and 'body' in parts[0] and 'data' in parts[0]['body']:
+                body = base64.urlsafe_b64decode(parts[0]['body']['data']).decode('utf-8', errors='ignore')
+        elif 'body' in payload and 'data' in payload['body']:
+            body = base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8', errors='ignore')
 
         estado = 'Critica' if 'critical' in subject.lower() else 'Warning' if 'warning' in subject.lower() else 'Informativo' if 'info' in subject.lower() else 'Desconocido'
         
         aws_account = re.search(r'AWS Account:\s+(\d+)', body)
         metric_name = re.search(r'MetricName:\s+([^\s,]+)', body)
-        region = re.search(r'Region:\s+([^\s,]+)', body)
         namespace = re.search(r'Namespace:\s+([^\s,]+)', body)
-        reason = re.search(r'NewStateReason:\s+([^\n]+)', body)
         
-        # Lista de patrones de servicio/recurso a buscar en el cuerpo
-        patrones_servicio = [
-            "cluster-stack (EKS)",
-            "EMAWSBSDB01",
-            "EMAWSCSDB03",
-            "E2K6IWMA8DFJ3O Sitio www.estafeta.com",
-            "alb-asg-WSFrecuency-prod-pub",
-            "asg-WSFrecuency",
-            "TG: tg-middlewareInvoice-pro-public del  ELB alb-middlewareInvoice-pro-public"
-        ]
-        
-        # Buscar cada patrón en el cuerpo del mensaje
+        # Extraer servicio
         servicio_recurso = ''
+        patrones_servicio = ["cluster-stack (EKS)", "EMAWSBSDB01", "EMAWSCSDB03", "E2K6IWMA8DFJ3O", "alb-asg-WSFrecuency"]
+        
         for patron in patrones_servicio:
             if patron in body:
                 servicio_recurso = patron
@@ -132,15 +130,21 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
         account_names = setup_aws()
         
         if (periodo == 'custom' or periodo == 'diario') and service is not None:
-            # Solo intentar obtener emails si tenemos servicio de Gmail
-            desde = datetime.now()
-            if horas:
-                desde -= timedelta(hours=horas)
-            else: 
-                desde -= timedelta(days=1)
+            ahora = datetime.now()
+            if periodo == 'custom' and horas:
+                desde = ahora - timedelta(hours=horas)
+                print(f"🕐 Filtrando alertas desde: {desde.strftime('%Y-%m-%d %H:%M:%S')} hasta: {ahora.strftime('%Y-%m-%d %H:%M:%S')}")
+            else:
+                desde = ahora - timedelta(days=1)
                 
             messages = get_emails(service, keyword, desde)
             df = analizar_mensajes(service, messages, account_names, horas)
+            
+            # Filtro adicional para periodo custom
+            if not df.empty and periodo == 'custom' and horas:
+                antes_filtro = len(df)
+                df = df[df['Fecha'] >= desde]
+                print(f"📅 Alertas antes del filtro: {antes_filtro}, después: {len(df)}")
             
             if not df.empty:
                 insertar_alertas(df)
@@ -230,6 +234,10 @@ def main(periodo, keyword=REPORT_CONFIG["DEFAULT_KEYWORD"], horas_custom=None):
     
     # Determinar las horas para el periodo personalizado
     horas = horas_custom if horas_custom else HORAS_CUSTOM if periodo == 'custom' else None
+    
+    if periodo == 'custom' and horas:
+        print(f"⏰ Configurado para últimas {horas} horas exactas")
+    
     generar_reporte(service, keyword, periodo, horas)
 
     print("✅ Reportes generados con éxito. Incluyen")
