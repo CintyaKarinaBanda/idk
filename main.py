@@ -15,20 +15,16 @@ HORAS_CUSTOM = REPORT_CONFIG["HORAS_CUSTOM"]
 
 def analizar_mensajes(service, messages, account_names, horas=None):
     data = []
-    # Usar datetime local del servidor para comparaciones correctas
-    ahora = datetime.now()
-    # Convertir a UTC para comparar con emails
+    # Usar datetime con zona horaria local del servidor
     from datetime import timezone
-    ahora = ahora.replace(tzinfo=timezone.utc)
+    import pytz
+    # El servidor está en CST, usar esa zona horaria
+    cst = pytz.timezone('America/Chicago')
+    ahora = datetime.now(cst)
     
-    # Debug: mostrar información del filtro
     if horas:
         limite_tiempo = ahora - timedelta(hours=horas)
-        print(f"🔍 DEBUG: Filtro activo - Solo emails desde {limite_tiempo.strftime('%Y-%m-%d %H:%M:%S')} (últimas {horas}h)")
-        print(f"🔍 DEBUG: Hora actual: {ahora.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"🔍 DEBUG: Zona horaria ahora: {ahora.tzinfo}")
-    else:
-        print("🔍 DEBUG: Sin filtro de horas - procesando todos los emails")
+        print(f"🔍 Filtro activo: últimas {horas}h (desde {limite_tiempo.strftime('%Y-%m-%d %H:%M:%S')})")
     
     emails_incluidos = 0
     emails_excluidos = 0
@@ -43,27 +39,17 @@ def analizar_mensajes(service, messages, account_names, horas=None):
             fecha_dt = parsedate_to_datetime(fecha_raw).astimezone()
             fecha_str = fecha_dt.strftime('%Y-%m-%d %H:%M:%S')
             
-            # Debug: mostrar fecha del email
-            print(f"📧 DEBUG: Email fecha: {fecha_str} | Subject: {subject[:50]}...")
-            print(f"📧 DEBUG: Email zona horaria: {fecha_dt.tzinfo}")
-            
             # Filtro exacto: solo incluir si está dentro del rango de horas
             if horas:
                 limite_tiempo = ahora - timedelta(hours=horas)
-                print(f"🔍 DEBUG: Comparando {fecha_dt} < {limite_tiempo}")
                 if fecha_dt < limite_tiempo:
                     emails_excluidos += 1
-                    print(f"❌ DEBUG: EXCLUIDO - Email de {fecha_str} está fuera del límite ({limite_tiempo.strftime('%Y-%m-%d %H:%M:%S')})")
                     continue
-                else:
-                    print(f"✅ DEBUG: INCLUIDO - Email de {fecha_str} está dentro del límite")
             
         except Exception as e:
-            print(f"⚠️ DEBUG: Error parseando fecha '{fecha_raw}': {e}")
             # Si no se puede parsear la fecha y hay filtro de horas, excluir
             if horas:
                 emails_excluidos += 1
-                print(f"❌ DEBUG: EXCLUIDO - No se pudo parsear la fecha y hay filtro activo")
                 continue
             fecha_str = fecha_raw
             fecha_dt = None
@@ -134,11 +120,7 @@ def analizar_mensajes(service, messages, account_names, horas=None):
             'Fecha_str': fecha_str
         })
 
-    # Debug: resumen final
-    print(f"📊 DEBUG: Resumen procesamiento:")
-    print(f"   - Emails incluidos: {emails_incluidos}")
-    print(f"   - Emails excluidos: {emails_excluidos}")
-    print(f"   - Total procesados: {emails_incluidos + emails_excluidos}")
+    print(f"📊 Procesados: {emails_incluidos} incluidos, {emails_excluidos} excluidos")
     
     return pd.DataFrame(data)
 
@@ -185,18 +167,16 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
         
         if (periodo == 'custom' or periodo == 'diario') and service is not None:
             # Solo intentar obtener emails si tenemos servicio de Gmail
-            # Usar hora local del servidor
-            desde = datetime.now()
-            from datetime import timezone
-            desde = desde.replace(tzinfo=timezone.utc)
+            # Usar hora local del servidor (CST)
+            import pytz
+            cst = pytz.timezone('America/Chicago')
+            desde = datetime.now(cst)
             if horas:
                 desde -= timedelta(hours=horas)
             else: 
                 desde -= timedelta(days=1)
                 
-            print(f"🔍 DEBUG: Buscando emails desde: {desde.strftime('%Y-%m-%d %H:%M:%S')}")
             messages = get_emails(service, keyword, desde)
-            print(f"📧 DEBUG: Gmail encontró {len(messages)} emails")
             df = analizar_mensajes(service, messages, account_names, horas)
             
             if not df.empty:
