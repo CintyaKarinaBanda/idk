@@ -30,9 +30,11 @@ except:
 df_bd = obtener_alertas_por_periodo("mensual")
 print(f"🗄️ {len(df_bd)} alertas en BD")
 
-if service and mensajes:
-    df_nuevas = analizar_mensajes(service, mensajes, cuentas_aws)
-    insertadas = insertar_alertas(df_nuevas)
-    print(f"✅ {insertadas} alertas nuevas insertadas")
+# Solo contar, no procesar para evitar cambio de formato de fecha
+print(f"📊 Comparación: {len(mensajes)} correos Gmail vs {len(df_bd)} alertas BD")
+if len(mensajes) > len(df_bd):
+    print(f"⚠️ Faltan {len(mensajes) - len(df_bd)} alertas en BD")
+elif len(mensajes) < len(df_bd):
+    print(f"ℹ️ BD tiene {len(df_bd) - len(mensajes)} alertas más que Gmail")
 else:
-    print("❌ No se pueden procesar correos sin Gmail")
+    print("✅ Gmail y BD están sincronizados")
