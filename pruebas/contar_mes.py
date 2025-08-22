@@ -3,19 +3,20 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions.gmail_manager import setup_gmail, get_emails
 from functions.aws_manager import setup_aws
-from functions.db_manager import obtener_alertas_por_periodo, insertar_alertas
+from functions.db_manager import get_engine
 from main import analizar_mensajes
+import pandas as pd
 from datetime import datetime
 
 hoy = datetime.now()
-inicio_mes = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+inicio_julio = datetime(2025, 7, 1, 0, 0, 0, 0)
 
-print(f"🗓️ Buscando desde: {inicio_mes.strftime('%d/%m/%Y %H:%M')}")
+print(f"🗓️ Buscando desde: {inicio_julio.strftime('%d/%m/%Y %H:%M')}")
 print(f"🗓️ Hasta hoy: {hoy.strftime('%d/%m/%Y %H:%M')}")
 
 try:
     service = setup_gmail()
-    mensajes = get_emails(service, "EST", inicio_mes, hoy)
+    mensajes = get_emails(service, "EST", inicio_julio, hoy)
     print(f"📧 {len(mensajes)} correos Gmail")
 except:
     service = None
@@ -27,8 +28,10 @@ try:
 except:
     cuentas_aws = {}
 
-df_bd = obtener_alertas_por_periodo("mensual")
-print(f"🗄️ {len(df_bd)} alertas en BD")
+# Consulta personalizada para dos meses desde julio
+query_dos_meses = "SELECT cuenta_id as \"Id cuenta\", cuenta_nombre as \"Nombre cuenta\", metrica as \"Metrica\", servicio as \"Servicio\", namespace as \"Namespace\", estado as \"Estado\", fecha_str as \"Fecha\" FROM alertas WHERE fecha_str::date >= '2025-07-01' AND fecha_str::date <= CURRENT_DATE"
+df_bd = pd.read_sql_query(query_dos_meses, get_engine())
+print(f"🗄️ {len(df_bd)} alertas en BD (julio-agosto)")
 
 # Solo contar, no procesar para evitar cambio de formato de fecha
 print(f"📊 Comparación: {len(mensajes)} correos Gmail vs {len(df_bd)} alertas BD")
