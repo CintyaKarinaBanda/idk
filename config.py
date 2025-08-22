@@ -31,8 +31,7 @@ REPORT_CONFIG = {
 
 # Configuración de la base de datos
 DB_CONFIG = {
-    "HOST": "34.229.52.197",
-    #"HOST": "localhost",               
+    "HOST": "localhost",               
     "DATABASE": "alarmasdb",         
     "USER": "alarmas",                 
     "PASSWORD": "Estafeta_1",          
