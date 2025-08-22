@@ -26,6 +26,7 @@ def analizar_mensajes(service, messages, account_names, horas=None):
         limite_tiempo = ahora - timedelta(hours=horas)
         print(f"🔍 DEBUG: Filtro activo - Solo emails desde {limite_tiempo.strftime('%Y-%m-%d %H:%M:%S')} (últimas {horas}h)")
         print(f"🔍 DEBUG: Hora actual: {ahora.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"🔍 DEBUG: Zona horaria ahora: {ahora.tzinfo}")
     else:
         print("🔍 DEBUG: Sin filtro de horas - procesando todos los emails")
     
@@ -44,10 +45,12 @@ def analizar_mensajes(service, messages, account_names, horas=None):
             
             # Debug: mostrar fecha del email
             print(f"📧 DEBUG: Email fecha: {fecha_str} | Subject: {subject[:50]}...")
+            print(f"📧 DEBUG: Email zona horaria: {fecha_dt.tzinfo}")
             
             # Filtro exacto: solo incluir si está dentro del rango de horas
             if horas:
                 limite_tiempo = ahora - timedelta(hours=horas)
+                print(f"🔍 DEBUG: Comparando {fecha_dt} < {limite_tiempo}")
                 if fecha_dt < limite_tiempo:
                     emails_excluidos += 1
                     print(f"❌ DEBUG: EXCLUIDO - Email de {fecha_str} está fuera del límite ({limite_tiempo.strftime('%Y-%m-%d %H:%M:%S')})")
