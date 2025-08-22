@@ -116,8 +116,7 @@ def analizar_mensajes(service, messages, account_names, horas=None):
             'Servicio': servicio_recurso,
             'Namespace': namespace.group(1) if namespace else '',
             'Estado': estado,
-            'Fecha': fecha_dt,
-            'Fecha_str': fecha_str
+            'Fecha': fecha_str
         })
 
     print(f"📊 Procesados: {emails_incluidos} incluidos, {emails_excluidos} excluidos")

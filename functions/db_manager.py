@@ -49,25 +49,30 @@ def insertar_alertas(df):
     # Contador de filas insertadas
     inserted_count = 0
     
-    # Insertar fila por fila verificando duplicados
+    # Insertar fila por fila verificando duplicados más estrictos
     for _, row in df_db.iterrows():
-        # Verificar si ya existe una alerta con la misma cuenta, métrica y fecha
+        # Verificar duplicados por cuenta, métrica, servicio, estado y fecha (más preciso)
         cursor.execute("""
         SELECT id FROM alertas 
-        WHERE cuenta_id = %s AND metrica = %s AND fecha = %s
-        """, (row['cuenta_id'], row['metrica'], row['fecha']))
+        WHERE cuenta_id = %s AND metrica = %s AND servicio = %s AND estado = %s 
+        AND ABS(EXTRACT(EPOCH FROM (fecha - %s))) < 300
+        """, (row['cuenta_id'], row['metrica'], row['servicio'], row['estado'], row['fecha']))
         
         # Si no existe, insertar
         if cursor.fetchone() is None:
-            cursor.execute("""
-            INSERT INTO alertas (cuenta_id, cuenta_nombre, metrica, servicio, namespace, estado, fecha, fecha_str)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                row['cuenta_id'], row['cuenta_nombre'], row['metrica'], 
-                row['servicio'], row['namespace'], row['estado'], 
-                row['fecha'], row['fecha_str']
-            ))
-            inserted_count += 1
+            try:
+                cursor.execute("""
+                INSERT INTO alertas (cuenta_id, cuenta_nombre, metrica, servicio, namespace, estado, fecha, fecha_str)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    row['cuenta_id'], row['cuenta_nombre'], row['metrica'], 
+                    row['servicio'], row['namespace'], row['estado'], 
+                    row['fecha'], row['fecha_str']
+                ))
+                inserted_count += 1
+            except Exception as e:
+                print(f"⚠️ Error insertando fila: {e}")
+                continue
     
     # Confirmar cambios y cerrar conexión
     conn.commit()
@@ -126,6 +131,39 @@ def verificar_tabla():
     conn.commit()
     conn.close()
     print("✅ Tabla de alertas verificada/creada correctamente")
+
+def eliminar_duplicados():
+    """Elimina registros duplicados de la tabla alertas"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Contar duplicados antes
+    cursor.execute("SELECT COUNT(*) FROM alertas")
+    total_antes = cursor.fetchone()[0]
+    
+    # Eliminar duplicados manteniendo el registro más reciente
+    cursor.execute("""
+    DELETE FROM alertas a1 USING alertas a2 
+    WHERE a1.id < a2.id 
+    AND a1.cuenta_id = a2.cuenta_id 
+    AND a1.metrica = a2.metrica 
+    AND a1.servicio = a2.servicio 
+    AND a1.estado = a2.estado 
+    AND ABS(EXTRACT(EPOCH FROM (a1.fecha - a2.fecha))) < 300
+    """)
+    
+    # Contar después
+    cursor.execute("SELECT COUNT(*) FROM alertas")
+    total_despues = cursor.fetchone()[0]
+    
+    eliminados = total_antes - total_despues
+    
+    conn.commit()
+    conn.close()
+    
+    print(f"✅ Duplicados eliminados: {eliminados}")
+    print(f"📊 Registros antes: {total_antes}, después: {total_despues}")
+    return eliminados
 
 def obtener_alertas_por_periodo(periodo, horas=None):
     """Obtiene alertas de la base de datos según el periodo especificado"""
