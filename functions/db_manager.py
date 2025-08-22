@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from config import DB_CONFIG
 
 def get_connection():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(host=DB_CONFIG["HOST"], database=DB_CONFIG["DATABASE"], user=DB_CONFIG["USER"], password=DB_CONFIG["PASSWORD"], port=DB_CONFIG["PORT"])
     print(f"✅ BD: {DB_CONFIG['HOST']}:{DB_CONFIG['PORT']}")
     return conn
 
