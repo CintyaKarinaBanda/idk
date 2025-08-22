@@ -50,8 +50,42 @@ def setup_gmail():
             token.write(creds.to_json())
     return build('gmail', 'v1', credentials=creds)
 
-def get_emails(service, keyword, desde_hora=None):
+def get_emails(service, keyword, desde_hora=None, hasta_hora=None):
     query = f"subject:{keyword}"
     if desde_hora:
         query += f" after:{desde_hora.strftime('%Y/%m/%d')}"
-    return service.users().messages().list(userId='me', q=query).execute().get('messages', [])
+    if hasta_hora:
+        query += f" before:{hasta_hora.strftime('%Y/%m/%d')}"
+    
+    # Obtener todos los correos usando paginación
+    messages = []
+    next_page_token = None
+    
+    while True:
+        try:
+            if next_page_token:
+                result = service.users().messages().list(
+                    userId='me', 
+                    q=query, 
+                    pageToken=next_page_token,
+                    maxResults=500
+                ).execute()
+            else:
+                result = service.users().messages().list(
+                    userId='me', 
+                    q=query,
+                    maxResults=500
+                ).execute()
+            
+            messages.extend(result.get('messages', []))
+            next_page_token = result.get('nextPageToken')
+            
+            if not next_page_token:
+                break
+                
+        except Exception as e:
+            print(f"⚠️ Error obteniendo correos: {e}")
+            break
+    
+    print(f"📧 Total de correos encontrados: {len(messages)}")
+    return messages
