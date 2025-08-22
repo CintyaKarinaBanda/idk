@@ -38,8 +38,7 @@ def insertar_alertas(df):
         'Servicio': 'servicio',
         'Namespace': 'namespace',
         'Estado': 'estado',
-        'Fecha': 'fecha',
-        'Fecha_str': 'fecha_str'
+        'Fecha': 'fecha_str'
     })
     
     # Obtener conexión y cursor
@@ -54,20 +53,19 @@ def insertar_alertas(df):
         # Verificar duplicados por cuenta, métrica, servicio, estado y fecha (más preciso)
         cursor.execute("""
         SELECT id FROM alertas 
-        WHERE cuenta_id = %s AND metrica = %s AND servicio = %s AND estado = %s 
-        AND ABS(EXTRACT(EPOCH FROM (fecha - %s))) < 300
-        """, (row['cuenta_id'], row['metrica'], row['servicio'], row['estado'], row['fecha']))
+        WHERE cuenta_id = %s AND metrica = %s AND servicio = %s AND estado = %s AND fecha_str = %s
+        """, (row['cuenta_id'], row['metrica'], row['servicio'], row['estado'], row['fecha_str']))
         
         # Si no existe, insertar
         if cursor.fetchone() is None:
             try:
                 cursor.execute("""
-                INSERT INTO alertas (cuenta_id, cuenta_nombre, metrica, servicio, namespace, estado, fecha, fecha_str)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO alertas (cuenta_id, cuenta_nombre, metrica, servicio, namespace, estado, fecha_str)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (
                     row['cuenta_id'], row['cuenta_nombre'], row['metrica'], 
                     row['servicio'], row['namespace'], row['estado'], 
-                    row['fecha'], row['fecha_str']
+                    row['fecha_str']
                 ))
                 inserted_count += 1
             except Exception as e:
@@ -178,8 +176,7 @@ def obtener_alertas_por_periodo(periodo, horas=None):
         servicio as "Servicio",
         namespace as "Namespace",
         estado as "Estado",
-        fecha as "Fecha",
-        fecha_str as "Fecha_str"
+        fecha_str as "Fecha"
     FROM alertas
     """
     
