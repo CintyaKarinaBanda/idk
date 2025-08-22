@@ -1,111 +1,26 @@
-import os
-import pandas as pd
+import os, pandas as pd
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.chart import PieChart, Reference
 from openpyxl.chart.label import DataLabelList
 from openpyxl.utils import get_column_letter
 from config import REPORT_CONFIG, EXCEL_STYLES
 
-def aplicar_formato(ws, filas, columnas, titulo=None):
-    # Bordes y alineación
-    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), 
-                         top=Side(style='thin'), bottom=Side(style='thin'))
-    
+def aplicar_formato(ws, filas, columnas):
+    border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
     for row in ws.iter_rows(min_row=filas[0], max_row=filas[1], min_col=columnas[0], max_col=columnas[1]):
         for cell in row:
-            cell.border = thin_border
+            cell.border = border
             cell.alignment = Alignment(horizontal='center', vertical='center')
-    
-    # Encabezados - solo la primera fila
     for col in range(columnas[0], columnas[1] + 1):
         cell = ws.cell(row=filas[0], column=col)
         cell.font = Font(bold=True, color=EXCEL_STYLES["HEADER_FONT_COLOR"])
-        cell.fill = PatternFill(start_color=EXCEL_STYLES["HEADER_COLOR"], 
-                              end_color=EXCEL_STYLES["HEADER_COLOR"], fill_type="solid")
-    
-    # Ancho columnas
-    for col in range(columnas[0], columnas[1] + 1):
+        cell.fill = PatternFill(start_color=EXCEL_STYLES["HEADER_COLOR"], end_color=EXCEL_STYLES["HEADER_COLOR"], fill_type="solid")
         ws.column_dimensions[get_column_letter(col)].width = 18
-    
-    # Título
-    if titulo:
-        ws.merge_cells(start_row=filas[0]-2, start_column=columnas[0], 
-                      end_row=filas[0]-2, end_column=columnas[1])
-        cell = ws.cell(row=filas[0]-2, column=columnas[0])
-        cell.value = titulo
-        cell.font = Font(bold=True, size=14)
-        cell.alignment = Alignment(horizontal='center')
-
-def generar_recomendaciones(df):
-    if len(df) == 0:
-        return ["No hay datos suficientes para generar recomendaciones."]
-    
-    recomendaciones = []
-    
-    # Alertas críticas
-    criticas = df[df['Estado'] == 'Critica']
-    if len(criticas) > 0:
-        # Métricas problemáticas
-        top_metricas = criticas.groupby('Metrica').size().sort_values(ascending=False).head(2)
-        for metrica, count in top_metricas.items():
-            recomendaciones.append(f"⚠️ La métrica '{metrica}' ha generado {count} alertas críticas.")
-        
-        # Cuentas con problemas
-        top_cuentas = criticas.groupby('Nombre cuenta').size().sort_values(ascending=False).head(1)
-        for cuenta, count in top_cuentas.items():
-            recomendaciones.append(f"⚠️ La cuenta '{cuenta}' tiene {count} alertas críticas.")
-    else:
-        recomendaciones.append("✅ No se detectaron alertas críticas en el período.")
-    
-    return recomendaciones
-
-def crear_grafico_circular(ws, row_start, resumen, chart_data):
-    # Crear un gráfico circular simple
-    chart = PieChart()
-    chart.title = "Distribución de Alertas por Severidad"
-    chart.style = EXCEL_STYLES["CHART_STYLE"]
-    chart.height = EXCEL_STYLES["CHART_HEIGHT"]  # Altura en unidades
-    chart.width = EXCEL_STYLES["CHART_WIDTH"]   # Ancho en unidades
-    
-    # Definir colores para cada tipo de alerta (rojo para críticos, amarillo para warnings, azul para info)
-    # Nota: Los colores se aplican en el orden en que aparecen los datos
-    
-    # Referencias a los datos y etiquetas
-    data_ref = Reference(ws, min_col=3, max_col=3, 
-                       min_row=row_start+len(resumen)+6, 
-                       max_row=row_start+len(resumen)+5+len(chart_data))
-    labels_ref = Reference(ws, min_col=2, 
-                         min_row=row_start+len(resumen)+6, 
-                         max_row=row_start+len(resumen)+5+len(chart_data))
-    
-    # Configurar el gráfico
-    chart.add_data(data_ref)
-    chart.set_categories(labels_ref)
-    
-    # Aplicar colores personalizados a las series
-    # En gráficos circulares, cada porción es una serie diferente
-    for i, serie in enumerate(chart.series):
-        if i < len(EXCEL_STYLES["CHART_COLORS"]):
-            serie.graphicalProperties.solidFill = EXCEL_STYLES["CHART_COLORS"][i]
-    
-    # Mostrar porcentajes en las etiquetas
-    chart.dataLabels = DataLabelList()
-    chart.dataLabels.showPercent = True
-    chart.dataLabels.showVal = False
-    chart.dataLabels.showCatName = False
-    
-    # Calcular posición relativa para la gráfica
-    chart_position = row_start + len(resumen) + len(chart_data) + 10
-    
-    # Añadir el gráfico a la hoja en posición relativa
-    ws.add_chart(chart, f"E{chart_position}")
 
 def generar_excel(df, resumen, periodo, horas=None):
     try:
         sufijo = f"_ultimas_{horas}h" if horas else ""
         archivo = f'{REPORT_CONFIG["EXCEL_DIR"]}/Alertas_{periodo}{sufijo}.xlsx'
-        
-        # Asegurar que el directorio de Excel existe
         os.makedirs(REPORT_CONFIG["EXCEL_DIR"], exist_ok=True)
 
         with pd.ExcelWriter(archivo, engine='openpyxl') as writer:
@@ -115,47 +30,29 @@ def generar_excel(df, resumen, periodo, horas=None):
                 for col in ['Región', 'Motivo', 'Namespace']:
                     if col in df.columns and df[col].notna().any():
                         columnas.append(col)
-                
-                df_detalle = df[columnas].rename(columns={
-                    'Id cuenta': 'ID Cuenta', 
-                    'Nombre cuenta': 'Nombre Cuenta', 
-                    'Metrica': 'Métrica',
-                    'Servicio': 'Servicio/Recurso'
-                })
-                
+                df_detalle = df[columnas].rename(columns={'Id cuenta': 'ID Cuenta', 'Nombre cuenta': 'Nombre Cuenta', 'Metrica': 'Métrica', 'Servicio': 'Servicio/Recurso'})
                 df_detalle.to_excel(writer, sheet_name='Detalle', index=False)
                 aplicar_formato(writer.sheets['Detalle'], [1, len(df_detalle) + 1], [1, len(df_detalle.columns)])
             else:
-                pd.DataFrame({'Mensaje': ['No hay alertas en el período seleccionado']}).to_excel(
-                    writer, sheet_name='Detalle', index=False)
+                pd.DataFrame({'Mensaje': ['No hay alertas en el período seleccionado']}).to_excel(writer, sheet_name='Detalle', index=False)
             
-            # Resumen con Dashboard
+            # Resumen
             pd.DataFrame().to_excel(writer, sheet_name='Resumen', index=False)
             ws2 = writer.sheets['Resumen']
             
             # KPIs
-            total = len(df)
-            criticas = len(df[df['Estado'] == 'Critica'])
-            warnings = len(df[df['Estado'] == 'Warning'])
-            info = len(df[df['Estado'] == 'Informativo'])
+            total, criticas, warnings, info = len(df), len(df[df['Estado'] == 'Critica']), len(df[df['Estado'] == 'Warning']), len(df[df['Estado'] == 'Informativo'])
+            pct_criticas, pct_warnings, pct_info = (criticas / total * 100) if total > 0 else 0, (warnings / total * 100) if total > 0 else 0, (info / total * 100) if total > 0 else 0
             
-            # Porcentajes
-            pct_criticas = (criticas / total * 100) if total > 0 else 0
-            pct_warnings = (warnings / total * 100) if total > 0 else 0
-            pct_info = (info / total * 100) if total > 0 else 0
-            
-            # Dashboard
             ws2['B2'] = "DASHBOARD DE ALERTAS"
             ws2['B2'].font = Font(bold=True, size=16)
             ws2.merge_cells('B2:F2')
             ws2['B2'].alignment = Alignment(horizontal='center')
             
-            # KPIs
             ws2['B4'], ws2['C4'], ws2['D4'], ws2['E4'] = "Total Alertas", "Críticas", "Warnings", "Informativas"
             ws2['B5'], ws2['C5'], ws2['D5'], ws2['E5'] = total, criticas, warnings, info
             ws2['C6'], ws2['D6'], ws2['E6'] = f"{pct_criticas:.1f}%", f"{pct_warnings:.1f}%", f"{pct_info:.1f}%"
             
-            # Formato KPIs
             ws2['B5'].font = Font(bold=True, size=14)
             ws2['C5'].font = Font(bold=True, size=14, color=EXCEL_STYLES["CRITICAL_COLOR"])
             ws2['D5'].font = Font(bold=True, size=14, color=EXCEL_STYLES["WARNING_COLOR"])
@@ -165,125 +62,56 @@ def generar_excel(df, resumen, periodo, horas=None):
                 ws2[f'{col}4'].font = Font(bold=True)
                 for row in range(4, 7):
                     ws2.cell(row=row, column=ord(col)-64).alignment = Alignment(horizontal='center')
-                    ws2.cell(row=row, column=ord(col)-64).border = Border(
-                        left=Side(style='thin'), right=Side(style='thin'),
-                        top=Side(style='thin'), bottom=Side(style='thin')
-                    )
-            
-            # Notas (antes Recomendaciones)
-            ws2.cell(row=8, column=2, value="NOTAS:")
-            ws2.cell(row=8, column=2).font = Font(bold=True)
-            
-            for i, rec in enumerate(generar_recomendaciones(df)[:3]):
-                ws2.cell(row=9+i, column=2, value=rec)
-            
-            row_start = 13  # Después de recomendaciones
-            
-            # Análisis por servicio
-            if not df.empty and 'Servicio' in df.columns and df['Servicio'].notna().any():
-                try:
-                    servicios = df.groupby(['Servicio', 'Estado']).size().unstack(fill_value=0).reset_index()
-                    servicios = servicios.rename(columns={'Servicio': 'Servicio/Recurso'})
-                    
-                    for estado in ['Critica', 'Warning', 'Informativo']:
-                        if estado not in servicios.columns:
-                            servicios[estado] = 0
-                    
-                    servicios['Total'] = servicios[['Critica', 'Warning', 'Informativo']].sum(axis=1)
-                    servicios = servicios.sort_values('Total', ascending=False)
-                    
-                    # Título
-                    ws2.cell(row=row_start, column=2, value="ANÁLISIS POR SERVICIO/RECURSO")
-                    ws2.cell(row=row_start, column=2).font = Font(bold=True, size=14)
-                    ws2.merge_cells(start_row=row_start, start_column=2, end_row=row_start, end_column=6)
-                    ws2.cell(row=row_start, column=2).alignment = Alignment(horizontal='center')
-                    
-                    # Encabezados
-                    headers = ['Servicio/Recurso', 'Critica', 'Warning', 'Informativo', 'Total']
-                    for j, header in enumerate(headers):
-                        ws2.cell(row=row_start+2, column=2+j, value=header)
-                    
-                    # Datos
-                    for i, row in enumerate(servicios.itertuples(index=False)):
-                        for j, val in enumerate(row):
-                            ws2.cell(row=row_start+3+i, column=2+j, value=val)
-                    
-                    aplicar_formato(ws2, [row_start+2, row_start+3+len(servicios)-1], 
-                                   [2, 2+len(headers)-1])
-                    
-                    row_start = row_start + 5 + len(servicios)
-                except Exception as e:
-                    print(f"Error en análisis de servicios: {e}")
+                    ws2.cell(row=row, column=ord(col)-64).border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
             
             # Resumen por cuenta
             if not resumen.empty:
-                # Título
-                ws2.cell(row=row_start, column=2, value="RESUMEN POR CUENTA, MÉTRICA Y SERVICIO")
-                ws2.cell(row=row_start, column=2).font = Font(bold=True, size=14)
-                ws2.merge_cells(start_row=row_start, start_column=2, end_row=row_start, end_column=6)
-                ws2.cell(row=row_start, column=2).alignment = Alignment(horizontal='center')
+                ws2.cell(row=13, column=2, value="RESUMEN POR CUENTA")
+                ws2.cell(row=13, column=2).font = Font(bold=True, size=14)
+                ws2.merge_cells(start_row=13, start_column=2, end_row=13, end_column=9)
+                ws2.cell(row=13, column=2).alignment = Alignment(horizontal='center')
                 
-                # Encabezados
                 headers = ['ID Cuenta', 'Nombre Cuenta', 'Métrica', 'Servicio/Recurso', 'Critica', 'Warning', 'Informativo', 'Total']
                 for j, header in enumerate(headers):
-                    ws2.cell(row=row_start+2, column=2+j, value=header)
+                    ws2.cell(row=15, column=2+j, value=header)
                 
-                # Datos con sangría para métricas
-                current_account = None
                 for i, row in enumerate(resumen.itertuples(index=False)):
                     for j, val in enumerate(row):
-                        cell = ws2.cell(row=row_start+3+i, column=2+j)
-                        
-                        # Añadir sangría a las métricas y servicios
-                        if j == 2:  # Índice de la columna Métrica
-                            cell.value = f"    {val}"  # Añadir sangría
-                            cell.alignment = Alignment(horizontal='left', vertical='center')
-                        elif j == 3:  # Índice de la columna Servicio
-                            cell.value = f"        {val}"  # Añadir sangría doble
-                            cell.alignment = Alignment(horizontal='left', vertical='center')
-                        else:
-                            cell.value = val
+                        ws2.cell(row=16+i, column=2+j, value=val)
                 
-                aplicar_formato(ws2, [row_start+2, row_start+3+len(resumen)-1], 
-                               [2, 2+len(headers)-1])
+                aplicar_formato(ws2, [15, 15+len(resumen)], [2, 9])
                 
-                # Gráfico circular
-                if all(col in resumen.columns for col in ['Critica', 'Warning', 'Informativo']):
+                # Gráfico
+                if criticas + warnings + info > 0:
                     try:
-                        # Datos para gráfico - mantener orden específico para los colores
-                        # El orden es importante: Críticas (rojo), Warnings (amarillo), Informativas (azul)
-                        chart_data = []
-                        # Siempre incluir las tres categorías en el mismo orden para mantener los colores consistentes
-                        chart_data.append(("Críticas", criticas))
-                        chart_data.append(("Warnings", warnings))
-                        chart_data.append(("Informativas", info))
-                        # Filtrar después los que tienen valor 0
+                        chart_data = [("Críticas", criticas), ("Warnings", warnings), ("Informativas", info)]
                         chart_data = [(label, value) for label, value in chart_data if value > 0]
                         
-                        # Escribir encabezados
-                        ws2.cell(row=row_start+len(resumen)+5, column=2, value="Estado")
-                        ws2.cell(row=row_start+len(resumen)+5, column=3, value="Cantidad")
+                        ws2.cell(row=18+len(resumen), column=2, value="Estado")
+                        ws2.cell(row=18+len(resumen), column=3, value="Cantidad")
                         
-                        # Escribir datos
                         for i, (label, value) in enumerate(chart_data):
-                            ws2.cell(row=row_start+len(resumen)+6+i, column=2, value=label)
-                            ws2.cell(row=row_start+len(resumen)+6+i, column=3, value=value)
+                            ws2.cell(row=19+len(resumen)+i, column=2, value=label)
+                            ws2.cell(row=19+len(resumen)+i, column=3, value=value)
                         
-                        # Aplicar formato a la tabla
-                        aplicar_formato(ws2, 
-                                      [row_start+len(resumen)+5, row_start+len(resumen)+5+len(chart_data)], 
-                                      [2, 3])
+                        aplicar_formato(ws2, [18+len(resumen), 18+len(resumen)+len(chart_data)], [2, 3])
                         
-                        # Gráfico
-                        if criticas + warnings + info > 0:
-                            try:
-                                crear_grafico_circular(ws2, row_start, resumen, chart_data)
-                            except Exception as e:
-                                print(f"Error en gráfico: {e}")
-                    except Exception as e:
-                        print(f"Error en datos para gráfico: {e}")
+                        chart = PieChart()
+                        chart.title = "Distribución de Alertas"
+                        chart.height, chart.width = EXCEL_STYLES["CHART_HEIGHT"], EXCEL_STYLES["CHART_WIDTH"]
+                        
+                        data_ref = Reference(ws2, min_col=3, max_col=3, min_row=19+len(resumen), max_row=18+len(resumen)+len(chart_data))
+                        labels_ref = Reference(ws2, min_col=2, min_row=19+len(resumen), max_row=18+len(resumen)+len(chart_data))
+                        
+                        chart.add_data(data_ref)
+                        chart.set_categories(labels_ref)
+                        
+                        chart.dataLabels = DataLabelList()
+                        chart.dataLabels.showPercent = True
+                        
+                        ws2.add_chart(chart, f"E{22+len(resumen)+len(chart_data)}")
+                    except: pass
         
         return True
-    except Exception as e:
-        print(f"Error al generar Excel: {e}")
+    except:
         return False

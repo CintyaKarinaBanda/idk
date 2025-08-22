@@ -33,17 +33,6 @@ def insertar_alertas(df):
     print(f"✅ {inserted} alertas insertadas")
     return inserted
 
-def actualizar_fechas_vacias():
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM alertas WHERE fecha IS NULL")
-    null_count = cursor.fetchone()[0]
-    if null_count > 0:
-        cursor.execute("UPDATE alertas SET fecha = TO_TIMESTAMP(fecha_str, 'Dy, DD Mon YYYY HH24:MI:SS +0000') WHERE fecha IS NULL")
-        print(f"✅ {null_count} fechas actualizadas")
-    conn.commit()
-    conn.close()
-
 def verificar_tabla():
     conn = get_connection()
     cursor = conn.cursor()
