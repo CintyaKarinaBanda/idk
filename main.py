@@ -15,9 +15,11 @@ HORAS_CUSTOM = REPORT_CONFIG["HORAS_CUSTOM"]
 
 def analizar_mensajes(service, messages, account_names, horas=None):
     data = []
-    # Usar datetime con zona horaria para comparaciones correctas
+    # Usar datetime local del servidor para comparaciones correctas
+    ahora = datetime.now()
+    # Convertir a UTC para comparar con emails
     from datetime import timezone
-    ahora = datetime.now(timezone.utc)
+    ahora = ahora.replace(tzinfo=timezone.utc)
     
     # Debug: mostrar información del filtro
     if horas:
@@ -180,8 +182,10 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
         
         if (periodo == 'custom' or periodo == 'diario') and service is not None:
             # Solo intentar obtener emails si tenemos servicio de Gmail
+            # Usar hora local del servidor
+            desde = datetime.now()
             from datetime import timezone
-            desde = datetime.now(timezone.utc)
+            desde = desde.replace(tzinfo=timezone.utc)
             if horas:
                 desde -= timedelta(hours=horas)
             else: 
