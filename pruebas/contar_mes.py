@@ -40,7 +40,7 @@ if len(mensajes) > len(df_bd):
     if service and mensajes:
         print("🔄 Procesando correos para insertar faltantes...")
         # Crear función temporal que preserve formato original de fecha
-        from functions.db_manager import insertar_alertas
+
         import re, base64
         from email.utils import parsedate_to_datetime
         
@@ -94,8 +94,38 @@ if len(mensajes) > len(df_bd):
             if resultado: data.append(resultado)
         
         df_nuevas = pd.DataFrame(data)
-        insertadas = insertar_alertas(df_nuevas)
-        print(f"✅ {insertadas} alertas insertadas")
+        print(f"📊 {len(df_nuevas)} correos procesados")
+        
+        # Inserción con manejo de errores mejorado
+        from functions.db_manager import get_connection
+        if not df_nuevas.empty:
+            df_db = df_nuevas.rename(columns={'Id cuenta': 'cuenta_id', 'Nombre cuenta': 'cuenta_nombre', 'Metrica': 'metrica', 'Servicio': 'servicio', 'Namespace': 'namespace', 'Estado': 'estado', 'Fecha': 'fecha_str'})
+            
+            conn = get_connection()
+            cursor = conn.cursor()
+            inserted = 0
+            
+            try:
+                for _, row in df_db.iterrows():
+                    try:
+                        cursor.execute("SELECT 1 FROM alertas WHERE cuenta_id=%s AND metrica=%s AND servicio=%s AND estado=%s AND fecha_str=%s", (row['cuenta_id'], row['metrica'], row['servicio'], row['estado'], row['fecha_str']))
+                        if not cursor.fetchone():
+                            cursor.execute("INSERT INTO alertas (cuenta_id, cuenta_nombre, metrica, servicio, namespace, estado, fecha_str) VALUES (%s,%s,%s,%s,%s,%s,%s)", tuple(row))
+                            inserted += 1
+                    except Exception as e:
+                        conn.rollback()
+                        print(f"⚠️ Error en registro: {e}")
+                        continue
+                
+                conn.commit()
+                print(f"✅ {inserted} alertas insertadas")
+            except Exception as e:
+                conn.rollback()
+                print(f"❌ Error en inserción: {e}")
+            finally:
+                conn.close()
+        else:
+            print("❌ No hay datos para insertar")
     else:
         print("❌ No se pueden procesar correos sin Gmail")
 elif len(mensajes) < len(df_bd):
