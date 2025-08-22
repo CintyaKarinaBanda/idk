@@ -14,8 +14,8 @@ GMAIL_CONFIG = {
 
 # Configuración de correo electrónico
 EMAIL_CONFIG = {
-    "REMITENTE": "karina.banda@xaldigital.com",
-    "PASSWORD": "efci nhmi nzmj ipjk",
+    "REMITENTE": "noreply@xaldigital.com",
+    "PASSWORD": "vcxv zzdu pyii arnw",
     "DESTINATARIO": "karina.banda@xaldigital.com",
     #"DESTINATARIO": "patricia.castillo@xaldigital.com",
     "COPIAS": []
