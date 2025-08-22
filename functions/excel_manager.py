@@ -111,7 +111,7 @@ def generar_excel(df, resumen, periodo, horas=None):
         with pd.ExcelWriter(archivo, engine='openpyxl') as writer:
             # Detalle
             if not df.empty:
-                columnas = ['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio', 'Estado', 'Fecha_str']
+                columnas = ['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio', 'Estado', 'Fecha']
                 for col in ['Región', 'Motivo', 'Namespace']:
                     if col in df.columns and df[col].notna().any():
                         columnas.append(col)
@@ -120,8 +120,7 @@ def generar_excel(df, resumen, periodo, horas=None):
                     'Id cuenta': 'ID Cuenta', 
                     'Nombre cuenta': 'Nombre Cuenta', 
                     'Metrica': 'Métrica',
-                    'Servicio': 'Servicio/Recurso',
-                    'Fecha_str': 'Fecha'
+                    'Servicio': 'Servicio/Recurso'
                 })
                 
                 df_detalle.to_excel(writer, sheet_name='Detalle', index=False)

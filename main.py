@@ -202,8 +202,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
                     'Servicio': ['Servicio Ejemplo'],
                     'Namespace': ['AWS/EC2'],
                     'Estado': ['Warning'],
-                    'Fecha': [datetime.now()],
-                    'Fecha_str': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
+                    'Fecha': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
                 })
 
         resumen = pd.DataFrame()
