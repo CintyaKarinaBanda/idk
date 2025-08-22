@@ -16,10 +16,10 @@ GMAIL_CONFIG = {
 EMAIL_CONFIG = {
     "REMITENTE": "noreply@xaldigital.com",
     "PASSWORD": "vcxv zzdu pyii arnw",
-    "DESTINATARIO": "karina.banda@xaldigital.com",
-    #"DESTINATARIO": "patricia.castillo@xaldigital.com",
-    "COPIAS": []
-    #"COPIAS": ['infraestructura@xaldigital.com', 'automation-nextgen@xaldigital.com']
+    #"DESTINATARIO": "karina.banda@xaldigital.com",
+    "DESTINATARIO": "patricia.castillo@xaldigital.com",
+    #"COPIAS": []
+    "COPIAS": ['infraestructura@xaldigital.com', 'automation-nextgen@xaldigital.com']
 }
 
 # Configuración de reportes
