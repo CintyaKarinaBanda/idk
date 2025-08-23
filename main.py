@@ -111,16 +111,19 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
             resumen = resumen.sort_values('Total', ascending=False)
         except: pass
     
-    if not generar_excel(df, resumen, periodo, horas): return
+    excel_generado = generar_excel(df, resumen, periodo, horas)
     print(f"✅ {len(df)} alertas")
     
     try:
-        archivo = os.path.join(os.getcwd(), REPORT_CONFIG["EXCEL_DIR"], f'Alertas_{periodo}{f"_ultimas_{horas}h" if horas else ""}.xlsx')
         subject, message = crear_mensaje_correo(periodo, horas, df)
-        yagmail.SMTP(EMAIL_CONFIG["REMITENTE"], EMAIL_CONFIG["PASSWORD"]).send(to=EMAIL_CONFIG["DESTINATARIO"], subject=subject, contents=message, cc=EMAIL_CONFIG["COPIAS"], attachments=archivo)
+        attachments = []
+        if excel_generado:
+            archivo = os.path.join(os.getcwd(), REPORT_CONFIG["EXCEL_DIR"], f'Alertas_{periodo}{f"_ultimas_{horas}h" if horas else ""}.xlsx')
+            attachments = [archivo]
+        yagmail.SMTP(EMAIL_CONFIG["REMITENTE"], EMAIL_CONFIG["PASSWORD"]).send(to=EMAIL_CONFIG["DESTINATARIO"], subject=subject, contents=message, cc=EMAIL_CONFIG["COPIAS"], attachments=attachments)
         print(f"✅ Enviado a {EMAIL_CONFIG['DESTINATARIO']}")
     except Exception as e:
-        print(f"⚠️ Error: {e}")
+        print(f"⚠️ Error envío: {e}")
 
 def main(periodo, keyword=REPORT_CONFIG["DEFAULT_KEYWORD"], horas_custom=None):
     print(f"\n📈 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
