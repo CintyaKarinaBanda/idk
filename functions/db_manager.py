@@ -57,7 +57,7 @@ def eliminar_duplicados():
 
 def obtener_alertas_por_periodo(periodo, horas=None):
     if periodo == "mensual":
-        query = "SELECT cuenta_id as \"Id cuenta\", cuenta_nombre as \"Nombre cuenta\", metrica as \"Metrica\", servicio as \"Servicio\", namespace as \"Namespace\", estado as \"Estado\", fecha_str as \"Fecha\" FROM alertas WHERE fecha_str::date >= date_trunc('month', CURRENT_DATE) AND fecha_str::date < date_trunc('month', CURRENT_DATE) + interval '1 month'"
+        query = "SELECT cuenta_id as \"Id cuenta\", cuenta_nombre as \"Nombre cuenta\", metrica as \"Metrica\", servicio as \"Servicio\", namespace as \"Namespace\", estado as \"Estado\", fecha_str as \"Fecha\" FROM alertas WHERE fecha_str::date >= date_trunc('month', CURRENT_DATE) - interval '1 month' AND fecha_str::date <= date_trunc('month', CURRENT_DATE) - interval '1 day'"
     else:
         query = "SELECT cuenta_id as \"Id cuenta\", cuenta_nombre as \"Nombre cuenta\", metrica as \"Metrica\", servicio as \"Servicio\", namespace as \"Namespace\", estado as \"Estado\", fecha_str as \"Fecha\" FROM alertas"
     df = pd.read_sql_query(query, get_engine())

@@ -87,26 +87,16 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
     except:
         account_names = {}
     
-    if service and periodo in ['custom', 'diario', 'julio', 'mensual']:
+    if service and periodo in ['custom', 'diario', 'julio']:
         if periodo == 'julio':
             messages = get_emails(service, keyword, datetime(2024, 7, 1), datetime(2024, 8, 1))
-            df = analizar_mensajes(service, messages, account_names)
-        elif periodo == 'mensual':
-            hoy = datetime.now(CST)
-            primer_dia_mes_actual = hoy.replace(day=1)
-            ultimo_dia_mes_anterior = primer_dia_mes_actual - timedelta(days=1)
-            primer_dia_mes_anterior = ultimo_dia_mes_anterior.replace(day=1)
-            messages = get_emails(service, keyword, primer_dia_mes_anterior, primer_dia_mes_actual)
             df = analizar_mensajes(service, messages, account_names)
         else:
             desde = datetime.now(CST) - (timedelta(hours=horas) if horas else timedelta(days=1))
             df = analizar_mensajes(service, get_emails(service, keyword, desde), account_names, horas)
         if not df.empty: insertar_alertas(df)
     else:
-        df_bd = obtener_alertas_por_periodo(periodo, horas)
-        if not df_bd.empty:
-            df = pd.concat([df, df_bd], ignore_index=True).drop_duplicates()
-        df = df if not df.empty else df_bd
+        df = obtener_alertas_por_periodo(periodo, horas)
         if df.empty and not service:
             df = pd.DataFrame([{'Id cuenta': '123456789012', 'Nombre cuenta': 'Cuenta Ejemplo', 'Metrica': 'CPUUtilization', 'Servicio': 'Servicio Ejemplo', 'Namespace': 'AWS/EC2', 'Estado': 'Warning', 'Fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}])
 
