@@ -10,22 +10,12 @@ def aplicar_formato(ws, filas, columnas):
     for row in ws.iter_rows(min_row=filas[0], max_row=filas[1], min_col=columnas[0], max_col=columnas[1]):
         for cell in row:
             cell.border = border
-            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
     for col in range(columnas[0], columnas[1] + 1):
         cell = ws.cell(row=filas[0], column=col)
         cell.font = Font(bold=True, color=EXCEL_STYLES["HEADER_FONT_COLOR"])
         cell.fill = PatternFill(start_color=EXCEL_STYLES["HEADER_COLOR"], end_color=EXCEL_STYLES["HEADER_COLOR"], fill_type="solid")
-        # Ajustar ancho según la columna
-        if col == columnas[0]:  # Primera columna (ID/Servicio)
-            ws.column_dimensions[get_column_letter(col)].width = 15
-        elif col == columnas[0] + 1:  # Segunda columna (Nombre/descripción)
-            ws.column_dimensions[get_column_letter(col)].width = 25
-        elif col == columnas[0] + 2:  # Tercera columna (Métrica)
-            ws.column_dimensions[get_column_letter(col)].width = 20
-        elif col == columnas[0] + 3:  # Cuarta columna (Servicio)
-            ws.column_dimensions[get_column_letter(col)].width = 30
-        else:  # Columnas de números
-            ws.column_dimensions[get_column_letter(col)].width = 12
+        ws.column_dimensions[get_column_letter(col)].width = 18
 
 def generar_excel(df, resumen, periodo, horas=None, resumen_servicio=pd.DataFrame()):
     try:
@@ -100,7 +90,7 @@ def generar_excel(df, resumen, periodo, horas=None, resumen_servicio=pd.DataFram
             
             # Resumen por servicio
             if not resumen_servicio.empty:
-                fila_inicio = 17 + len(resumen) if not resumen.empty else 13
+                fila_inicio = 18 + len(resumen) if not resumen.empty else 13
                 ws2.cell(row=fila_inicio, column=2, value="RESUMEN POR SERVICIO")
                 ws2.cell(row=fila_inicio, column=2).font = Font(bold=True, size=14)
                 ws2.merge_cells(start_row=fila_inicio, start_column=2, end_row=fila_inicio, end_column=6)
