@@ -86,7 +86,7 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
     except:
         account_names = {}
     
-    if service and periodo in ['custom', 'diario'] and periodo != 'mensual':
+    if service and periodo in ['custom', 'diario']:
         desde = datetime.now(CST) - (timedelta(hours=horas) if horas else timedelta(days=1))
         df = analizar_mensajes(service, get_emails(service, keyword, desde), account_names, horas)
         if not df.empty: insertar_alertas(df)
