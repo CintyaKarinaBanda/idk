@@ -108,13 +108,21 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
     
     excel_generado = generar_excel(df, resumen, periodo, horas)
     print(f"✅ {len(df)} alertas")
+    print(f"📄 Excel generado: {excel_generado}")
     
     try:
         subject, message = crear_mensaje_correo(periodo, horas, df)
         attachments = []
         if excel_generado:
             archivo = os.path.join(os.getcwd(), REPORT_CONFIG["EXCEL_DIR"], f'Alertas_{periodo}{f"_ultimas_{horas}h" if horas else ""}.xlsx')
-            attachments = [archivo]
+            print(f"📎 Archivo: {archivo}")
+            if os.path.exists(archivo):
+                attachments = [archivo]
+                print(f"✅ Archivo existe, adjuntando")
+            else:
+                print(f"⚠️ Archivo no existe")
+        else:
+            print(f"⚠️ Excel no generado, enviando sin adjunto")
         yagmail.SMTP(EMAIL_CONFIG["REMITENTE"], EMAIL_CONFIG["PASSWORD"]).send(to=EMAIL_CONFIG["DESTINATARIO"], subject=subject, contents=message, cc=EMAIL_CONFIG["COPIAS"], attachments=attachments)
         print(f"✅ Enviado a {EMAIL_CONFIG['DESTINATARIO']}")
     except Exception as e:
