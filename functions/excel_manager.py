@@ -113,5 +113,6 @@ def generar_excel(df, resumen, periodo, horas=None):
                     except: pass
         
         return True
-    except:
+    except Exception as e:
+        print(f"⚠️ Error generando Excel: {e}")
         return False
