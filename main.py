@@ -97,32 +97,32 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
 
     
     resumen = pd.DataFrame()
+    resumen_servicio = pd.DataFrame()
     if not df.empty:
         try:
-            resumen = df.groupby(['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio', 'Estado']).size().reset_index(name='Cantidad').pivot_table(index=['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio'], columns='Estado', values='Cantidad', fill_value=0).reset_index().sort_values(['Id cuenta', 'Nombre cuenta', 'Metrica'])
-            for estado in ['Critica', 'Warning', 'Informativo']:
-                if estado not in resumen.columns: resumen[estado] = 0
-            resumen['Total'] = resumen[['Critica', 'Warning', 'Informativo']].sum(axis=1)
-            resumen = resumen.sort_values('Total', ascending=False)
+            resumen = df.groupby(['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio', 'Estado']).size().reset_index(name='Cantidad').pivot_table(index=['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio'], columns='Estado', values='Cantidad', fill_value=0).reset_index()
+            # Solo agregar columnas que existen en los datos
+            estados_existentes = [col for col in ['Critica', 'Warning', 'Informativo'] if col in resumen.columns]
+            if estados_existentes:
+                resumen['Total'] = resumen[estados_existentes].sum(axis=1)
+                resumen = resumen.sort_values('Total', ascending=False)
+            
+            # Resumen por servicio
+            resumen_servicio = df.groupby(['Servicio', 'Estado']).size().reset_index(name='Cantidad').pivot_table(index='Servicio', columns='Estado', values='Cantidad', fill_value=0).reset_index()
+            if estados_existentes:
+                resumen_servicio['Total'] = resumen_servicio[estados_existentes].sum(axis=1)
+                resumen_servicio = resumen_servicio.sort_values('Total', ascending=False)
         except: pass
     
-    excel_generado = generar_excel(df, resumen, periodo, horas)
+    excel_generado = generar_excel(df, resumen, periodo, horas, resumen_servicio)
     print(f"✅ {len(df)} alertas")
-    print(f"📄 Excel generado: {excel_generado}")
     
     try:
         subject, message = crear_mensaje_correo(periodo, horas, df)
         attachments = []
         if excel_generado:
             archivo = os.path.join(os.getcwd(), REPORT_CONFIG["EXCEL_DIR"], f'Alertas_{periodo}{f"_ultimas_{horas}h" if horas else ""}.xlsx')
-            print(f"📎 Archivo: {archivo}")
-            if os.path.exists(archivo):
-                attachments = [archivo]
-                print(f"✅ Archivo existe, adjuntando")
-            else:
-                print(f"⚠️ Archivo no existe")
-        else:
-            print(f"⚠️ Excel no generado, enviando sin adjunto")
+            attachments = [archivo]
         yagmail.SMTP(EMAIL_CONFIG["REMITENTE"], EMAIL_CONFIG["PASSWORD"]).send(to=EMAIL_CONFIG["DESTINATARIO"], subject=subject, contents=message, cc=EMAIL_CONFIG["COPIAS"], attachments=attachments)
         print(f"✅ Enviado a {EMAIL_CONFIG['DESTINATARIO']}")
     except Exception as e:

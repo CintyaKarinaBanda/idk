@@ -17,7 +17,7 @@ def aplicar_formato(ws, filas, columnas):
         cell.fill = PatternFill(start_color=EXCEL_STYLES["HEADER_COLOR"], end_color=EXCEL_STYLES["HEADER_COLOR"], fill_type="solid")
         ws.column_dimensions[get_column_letter(col)].width = 18
 
-def generar_excel(df, resumen, periodo, horas=None):
+def generar_excel(df, resumen, periodo, horas=None, resumen_servicio=pd.DataFrame()):
     try:
         sufijo = f"_ultimas_{horas}h" if horas else ""
         archivo = f'{REPORT_CONFIG["EXCEL_DIR"]}/Alertas_{periodo}{sufijo}.xlsx'
@@ -80,6 +80,24 @@ def generar_excel(df, resumen, periodo, horas=None):
                         ws2.cell(row=16+i, column=2+j, value=val)
                 
                 aplicar_formato(ws2, [15, 15+len(resumen)], [2, 9])
+            
+            # Resumen por servicio
+            if not resumen_servicio.empty:
+                fila_inicio = 18 + len(resumen) if not resumen.empty else 13
+                ws2.cell(row=fila_inicio, column=2, value="RESUMEN POR SERVICIO")
+                ws2.cell(row=fila_inicio, column=2).font = Font(bold=True, size=14)
+                ws2.merge_cells(start_row=fila_inicio, start_column=2, end_row=fila_inicio, end_column=6)
+                ws2.cell(row=fila_inicio, column=2).alignment = Alignment(horizontal='center')
+                
+                headers_servicio = ['Servicio/Recurso'] + [col for col in resumen_servicio.columns if col != 'Servicio']
+                for j, header in enumerate(headers_servicio):
+                    ws2.cell(row=fila_inicio+2, column=2+j, value=header)
+                
+                for i, row in enumerate(resumen_servicio.itertuples(index=False)):
+                    for j, val in enumerate(row):
+                        ws2.cell(row=fila_inicio+3+i, column=2+j, value=val)
+                
+                aplicar_formato(ws2, [fila_inicio+2, fila_inicio+2+len(resumen_servicio)], [2, 2+len(headers_servicio)-1])
                 
                 # Gráfico
                 if criticas + warnings + info > 0:
