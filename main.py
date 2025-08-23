@@ -100,17 +100,21 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
     resumen_servicio = pd.DataFrame()
     if not df.empty:
         try:
-            resumen = df.groupby(['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio', 'Estado']).size().reset_index(name='Cantidad').pivot_table(index=['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio'], columns='Estado', values='Cantidad', fill_value=0).reset_index()
-            # Solo agregar columnas que existen en los datos
-            estados_existentes = [col for col in ['Critica', 'Warning', 'Informativo'] if col in resumen.columns]
-            if estados_existentes:
-                resumen['Total'] = resumen[estados_existentes].sum(axis=1)
+            # Resumen por cuenta - solo columnas con datos
+            pivot_resumen = df.groupby(['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio', 'Estado']).size().reset_index(name='Cantidad').pivot_table(index=['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio'], columns='Estado', values='Cantidad', fill_value=0).reset_index()
+            # Filtrar solo columnas que tienen datos (no todas ceros)
+            cols_con_datos = [col for col in ['Critica', 'Warning', 'Informativo'] if col in pivot_resumen.columns and pivot_resumen[col].sum() > 0]
+            resumen = pivot_resumen[['Id cuenta', 'Nombre cuenta', 'Metrica', 'Servicio'] + cols_con_datos].copy()
+            if cols_con_datos:
+                resumen['Total'] = resumen[cols_con_datos].sum(axis=1)
                 resumen = resumen.sort_values('Total', ascending=False)
             
             # Resumen por servicio
-            resumen_servicio = df.groupby(['Servicio', 'Estado']).size().reset_index(name='Cantidad').pivot_table(index='Servicio', columns='Estado', values='Cantidad', fill_value=0).reset_index()
-            if estados_existentes:
-                resumen_servicio['Total'] = resumen_servicio[estados_existentes].sum(axis=1)
+            pivot_servicio = df.groupby(['Servicio', 'Estado']).size().reset_index(name='Cantidad').pivot_table(index='Servicio', columns='Estado', values='Cantidad', fill_value=0).reset_index()
+            cols_servicio = [col for col in ['Critica', 'Warning', 'Informativo'] if col in pivot_servicio.columns and pivot_servicio[col].sum() > 0]
+            resumen_servicio = pivot_servicio[['Servicio'] + cols_servicio].copy()
+            if cols_servicio:
+                resumen_servicio['Total'] = resumen_servicio[cols_servicio].sum(axis=1)
                 resumen_servicio = resumen_servicio.sort_values('Total', ascending=False)
         except: pass
     
