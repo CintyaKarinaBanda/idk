@@ -73,7 +73,6 @@ def crear_mensaje_correo(periodo, horas, df):
     fecha, num = datetime.now().strftime('%Y-%m-%d'), len(df)
     configs = {
         'mensual': (f"Concentrado mensual de alarmas Estafeta: {fecha}", "mensual"),
-        'julio': (f"Concentrado de alarmas Estafeta - Julio 2024: {num} alertas ({fecha})", "del mes de julio 2024"),
         'custom': (f"Concentrado de alarmas Estafeta: {num} alertas en últimas {horas}h ({fecha})", f"de las últimas {horas} horas")
     }
     subject, detalle = configs.get(periodo, (f"Concentrado de alarmas Estafeta: {num} alertas - {periodo.capitalize()} ({fecha})", periodo))
@@ -87,18 +86,30 @@ def generar_reporte(service, keyword, periodo='diario', horas=None):
     except:
         account_names = {}
     
-    if service and periodo in ['custom', 'diario', 'julio']:
-        if periodo == 'julio':
-            messages = get_emails(service, keyword, datetime(2024, 7, 1), datetime(2024, 8, 1))
-            df = analizar_mensajes(service, messages, account_names)
+    df_gmail = pd.DataFrame()
+    if service and periodo in ['custom', 'diario', 'mensual']:
+        if periodo == 'mensual':
+            hoy = datetime.now(CST)
+            primer_dia_mes_actual = hoy.replace(day=1)
+            ultimo_dia_mes_anterior = primer_dia_mes_actual - timedelta(days=1)
+            primer_dia_mes_anterior = ultimo_dia_mes_anterior.replace(day=1)
+            messages = get_emails(service, keyword, primer_dia_mes_anterior, primer_dia_mes_actual)
+            df_gmail = analizar_mensajes(service, messages, account_names)
         else:
             desde = datetime.now(CST) - (timedelta(hours=horas) if horas else timedelta(days=1))
-            df = analizar_mensajes(service, get_emails(service, keyword, desde), account_names, horas)
-        if not df.empty: insertar_alertas(df)
+            df_gmail = analizar_mensajes(service, get_emails(service, keyword, desde), account_names, horas)
+        if not df_gmail.empty: insertar_alertas(df_gmail)
+    
+    df_bd = obtener_alertas_por_periodo(periodo, horas)
+    
+    if not df_gmail.empty and not df_bd.empty:
+        df = pd.concat([df_gmail, df_bd], ignore_index=True).drop_duplicates()
+    elif not df_gmail.empty:
+        df = df_gmail
+    elif not df_bd.empty:
+        df = df_bd
     else:
-        df = obtener_alertas_por_periodo(periodo, horas)
-        if df.empty and not service:
-            df = pd.DataFrame([{'Id cuenta': '123456789012', 'Nombre cuenta': 'Cuenta Ejemplo', 'Metrica': 'CPUUtilization', 'Servicio': 'Servicio Ejemplo', 'Namespace': 'AWS/EC2', 'Estado': 'Warning', 'Fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}])
+        df = pd.DataFrame([{'Id cuenta': '123456789012', 'Nombre cuenta': 'Cuenta Ejemplo', 'Metrica': 'CPUUtilization', 'Servicio': 'Servicio Ejemplo', 'Namespace': 'AWS/EC2', 'Estado': 'Warning', 'Fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}])
 
     
     resumen = pd.DataFrame()
@@ -135,7 +146,7 @@ def main(periodo, keyword=REPORT_CONFIG["DEFAULT_KEYWORD"], horas_custom=None):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--periodo', default="mensual", choices=["diario", "semanal", "mensual", "custom", "julio"])
+    parser.add_argument('--periodo', default="mensual", choices=["diario", "semanal", "mensual", "custom"])
     parser.add_argument('--keyword', default=REPORT_CONFIG["DEFAULT_KEYWORD"])
     parser.add_argument('--horas', type=int)
     args = parser.parse_args()
